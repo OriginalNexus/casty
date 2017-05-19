@@ -1,0 +1,254 @@
+/*** General styles ***/
+
+body {
+	font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+	padding-bottom: 82px; /* for player */
+	min-height: initial;
+}
+
+.container {
+	max-width: 1140px;
+	margin-right: auto;
+	margin-left: auto;
+	padding: 8px;
+}
+.fixed-bottom {
+	position: fixed;
+	z-index: 1000;
+	left: 0;
+	right: 0;
+	bottom: 0;
+}
+
+.flex {
+	display: flex;
+}
+.flex-noshrink {
+	flex-shrink: 0;
+}
+
+.text-danger {
+	color: rgb(213, 0, 0);
+}
+
+
+/*** Page components ***/
+
+/* URL input */
+#input-textfield-group ~ button {
+	margin-left: 16px;
+	flex-shrink: 0;
+}
+
+/* Results */
+#results .thumbnail {
+	width: 50px;
+    height: 50px;
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: 50% 50%;
+    margin-right: 8px;
+}
+#results .search-result {
+	margin-bottom: 8px;
+	display: flex;
+	flex-flow: row nowrap;
+	align-items: center;
+	cursor: pointer;
+}
+#results .search-result:active {
+	background-color: #C5CAE9;
+}
+
+#results .search-result p {
+	margin-top: 0px;
+	margin-bottom: 0px;
+}
+
+/* Playlist */
+#playlist {
+	-webkit-animation: fadeOutDown 0.5s;
+	animation: fadeOutDown 0.5s;
+	-webkit-animation-fill-mode: forwards;
+	animation-fill-mode: forwards;
+	margin-bottom: 25px;
+}
+#playlist .mdl-card {
+	width: 100%;
+	margin-left: auto;
+	min-height: 100px;
+	max-width: 840px;
+}
+#playlist.playlist-opened {
+	-webkit-animation: fadeInUp 0.5s;
+	animation: fadeInUp 0.5s;
+}
+
+/* Player */
+#player {
+	position: relative;
+	box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.4);
+	background-color: rgb(255, 255, 255);
+	z-index: 1;
+}
+.player-height {
+	height: 50px;
+}
+
+#player .title, #player .source {
+	margin-top: 0px;
+	margin-bottom: 0px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: calc(100% - 58px);
+	text-decoration: none;
+}
+#player .thumbnail {
+	width: 50px;
+	height: 50px;
+	background-size: cover;
+	background-repeat: no-repeat;
+	background-position: 50% 50%;
+	margin-right: 8px;
+}
+#player .time {
+	position: absolute;
+	right: 16px;
+	top: 0px;
+	font-size: 12px;
+}
+
+/* Play/Pause button */
+#play-pause-btn {
+	margin-left: 8px;
+	margin-right: 8px;
+}
+#play-pause-btn.pause .icon-play, #play-pause-btn .icon-pause {
+	 display: none;
+}
+#play-pause-btn .icon-play, #play-pause-btn.pause .icon-pause {
+	display: initial;
+}
+
+/* Progress bar */
+#player .progress-wrapper {
+	position: absolute;
+	top: -9px;
+	left: -26px;
+	right: -26px;
+	z-index: 1;
+}
+#progress-bar:after {
+	content: "";
+	position: absolute;
+	user-select: none;
+	pointer-events: none;
+	top: -15px;
+	bottom: -15px;
+	left: 0;
+	right: 0;
+}
+
+
+/*** Media queries ***/
+
+/* Tablet or phone */
+@media (max-width: 839px) {
+
+	/* Join playlist and player */
+	#playlist {
+		margin-bottom: 0px;
+		box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.4);
+	}
+	#playlist .mdl-card {
+		box-shadow: none;
+	}
+
+	#playlist.playlist-opened ~ #player {
+		box-shadow: none;
+		border-top: 1px solid rgba(0, 0, 0, 0.12);
+	}
+
+}
+
+/* Phone */
+@media (max-width: 479px) {
+
+	/* Player height doubles on small devices */
+	body {
+		padding-bottom: 148px;
+	}
+}
+
+
+/*** Animations ***/
+
+/* Fade In Up */
+@-webkit-keyframes fadeInUp {
+	from {
+		opacity: 0;
+		transform: translate3d(0, 100%, 0);
+	}
+
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@keyframes fadeInUp {
+	from {
+		opacity: 0;
+		transform: translate3d(0, 100%, 0);
+	}
+
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+/* Fade Out Down */
+@-webkit-keyframes fadeOutDown {
+	from {
+		opacity: 1;
+		transform: none
+	}
+
+	to {
+		opacity: 0;
+		transform: translate3d(0, 100%, 0);
+	}
+}
+
+@keyframes fadeOutDown {
+	from {
+		opacity: 1;
+		transform: none
+	}
+
+	to {
+		opacity: 0;
+		transform: translate3d(0, 100%, 0);
+	}
+}
+
+
+/*** Other ***/
+
+/* MDL changes/improvements */
+.mdl-button--icon {
+	width: 48px;
+	height: 48px;
+}
+.mdl-button--icon.mdl-button--icon-large {
+	width: 56px;
+	height: 56px;
+}
+.mdl-button--icon-large .material-icons {
+	-webkit-transform: translate(-24px, -24px);
+	transform: translate(-24px, -24px);
+	font-size: 48px;
+	line-height: 48px;
+}
