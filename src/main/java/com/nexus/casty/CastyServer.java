@@ -165,15 +165,13 @@ class CastyServer {
 				try {
 					// Find file
 					URL fileURL = getClass().getResource(resourcePath);
+					InputStream stream = getClass().getResourceAsStream(resourcePath);
 //					URL fileURL = new File("src/main/resources" + resourcePath).toURI().toURL();
 					if (fileURL == null) {
 						fileURL = getClass().getResource("/html/404.html");
 						returnCode = 404;
 					}
 					String filePath = fileURL.getPath();
-					File file = new File(filePath);
-
-					long length = file.length();
 
 					// Set content type
 					String contentType = "";
@@ -193,15 +191,19 @@ class CastyServer {
 					}
 					if (!contentType.isEmpty()) httpExchange.getResponseHeaders().add("Content-type", contentType);
 
-					httpExchange.sendResponseHeaders(returnCode, length);
+					httpExchange.sendResponseHeaders(returnCode, 0);
 
 					// Send file
-					if (length > 0) Files.copy(file.toPath(), httpExchange.getResponseBody());
+					OutputStream output = httpExchange.getResponseBody();
+					int len, BUF_LEN = 1024 * 1024;
+					byte[] buf = new byte[BUF_LEN];
+					while ((len = stream.read(buf, 0, BUF_LEN)) != -1) output.write(buf, 0, len);
+
 
 				} catch (NullPointerException | IOException | SecurityException e) {
 					System.err.println("Server error: " + httpExchange.getRequestURI().toString());
 					e.printStackTrace();
-					httpExchange.sendResponseHeaders(500, 0);
+					httpExchange.sendResponseHeaders(500, -1);
 				}
 			}
 			else {
