@@ -1,13 +1,18 @@
-group 'com.nexus'
-version '1.0.0'
-description 'A user-friendly audio casting webserver'
-
 apply plugin: 'java'
+apply plugin: 'application'
 apply plugin: 'idea'
+
+sourceCompatibility = 1.8
+group = 'com.nexus'
+version = '1.1.0'
+description = 'A user-friendly audio casting web server'
+mainClassName = 'com.nexus.casty.CastyMain'
 
 jar {
     manifest {
-        attributes 'Main-Class': 'com.nexus.casty.CastyMain'
+        attributes 'Main-Class': 'com.nexus.casty.CastyMain',
+                'Implementation-Title': 'Casty',
+                'Implementation-Version': version
     }
 
     from {
@@ -15,16 +20,16 @@ jar {
     }
 }
 
-
 repositories {
     jcenter()
 }
 
 dependencies {
+    compile 'org.jetbrains:annotations:15.0'
     compile 'com.google.code.gson:gson:2.8.0'
     compile 'org.slf4j:slf4j-nop:1.7.25'
     compile 'com.jgoodies:jgoodies-forms:1.9.0'
     compile 'uk.co.caprica:vlcj:3.10.1'
-    compile 'com.originalnexus:ytd:1.0.2'
+    compile 'com.originalnexus:ytd:1.0.4'
 
 }

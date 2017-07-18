@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
 	<meta charset="utf-8">
+	<link rel="shortcut icon" sizes="16x16" href="img/app-16x16.png">
+	<link rel="shortcut icon" sizes="32x32 48x48 64x64 128x128" href="img/app.png">
+	<meta name="theme-color" content="#3f51b5">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 	<title>Casty Player</title>
@@ -14,86 +17,96 @@
 </head>
 
 <body>
-
-<div class="md-grid container">
-	<div class="mdl-cell mdl-cell--12-col">
-		<h1>Casty Player</h1>
-		<div id="offline-message" style="display: none;">
-			<p class="text-danger">Connection lost </p>
-			<button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--primary" onclick="updateStatus();">
-				Refresh <i class="material-icons">refresh</i>
-			</button>
-		</div>
-		<hr>
-		<div class="flex" style="align-items: center;">
-			<div id="input-textfield-group" class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label" style="flex-grow: 1;">
-				<input class="mdl-textfield__input" type="text" id="input-textfield" oninput="inputChanged();">
-				<label class="mdl-textfield__label" for="input-textfield">Input</label>
-				<span class="mdl-textfield__error">Required</span>
+<div id="page-wrapper" class="flex-vertical">
+	<div id="top-wrapper" class="flex-noshrink">
+		<div class="mdl-grid">
+			<div class="mdl-cell mdl-cell--3-col-desktop mdl-cell--3-col-tablet mdl-cell--1-col-phone flex flex-align">
+				<img class="app-icon" src="img/app.png">
+				<p class="app-title mdl-typography--display-1">Casty</p>
 			</div>
-			<button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--primary" onclick="searchBtnClick();">
-				Search
-			</button>
-			<button class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect" onclick="playBtnClick();">
-				Play
-			</button>
-		</div>
-		<div id="results-wrapper" style="display: none;">
-			<h3>Search results</h3>
-			<div id="results">
-
+			<div class="mdl-cell mdl-cell--6-col-desktop mdl-cell--5-col-tablet mdl-cell--3-col-phone flex flex-align flex-center">
+				<div id="search-textfield-group" class="mdl-textfield mdl-js-textfield flex-grow">
+					<input class="mdl-textfield__input" type="text" id="search-textfield">
+					<label class="mdl-textfield__label" for="search-textfield">Search</label>
+				</div>
 			</div>
-		</div>
-	</div>
-</div>
-
-
-<div id="player-container" class="fixed-bottom">
-	<div id="playlist" class="container" style="display: none;">
-		<div class="mdl-card mdl-shadow--2dp">
-			<div class="mdl-card__title">
-				<h2 class="mdl-card__title-text">Playlist</h2>
+			<div class="mdl-cell mdl-cell--3-col-desktop mdl-cell--12-col-tablet flex flex-align flex-end flex-noshrink">
+				<button id="search-btn" class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--primary">Search</button>
 			</div>
-			<div class="mdl-card__supporting-text">
-				Coming soon...
+			<div id="offline-wrapper" class="mdl-cell mdl-cell--12-col flex flex-align" style="display: none;">
+				<p class="text-danger">Connection lost</p>
+				<button id="connection-retry-btn" class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--primary">Refresh <i class="material-icons">refresh</i></button>
 			</div>
 		</div>
 	</div>
 
-	<div id="player">
-		<div class="progress-wrapper">
-			<input class="mdl-slider mdl-js-slider" type="range" id="progress-bar" min="0" max="100" step="0.1" value="0">
+	<div id="content-wrapper" class="flex-grow">
+		<div id="content-overlay" class="flex flex-align flex-center" style="display: none;">
+			<div class="mdl-spinner mdl-js-spinner"></div>
 		</div>
-		<p class="time">3:24/4:03</p>
 		<div class="mdl-grid container">
-			<div class="mdl-cell mdl-cell--5-col-desktop mdl-cell--3-col-tablet mdl-cell--4-col-phone flex player-height" style="flex-flow: column wrap; justify-content: space-around; align-content: flex-start; align-items: flex-start;">
-				<a class="thumbnail" target="_blank"></a>
-				<p class="title"></p>
-				<a class="source" target="_blank"></a>
-			</div>
-			<div id="player-controls" class="mdl-cell mdl-cell--2-col-desktop mdl-cell--2-col-tablet mdl-cell--1-offset-phone mdl-cell--2-col-phone flex player-height" style="justify-content: center; align-items: center">
-				<button class="mdl-button mdl-js-button mdl-button--icon mdl-js-ripple-effect mdl-button--icon-medium flex-noshrink" type="button" disabled>
-					<i class="material-icons">skip_previous</i>
-				</button>
-				<button id="play-pause-btn" class="mdl-button mdl-js-button mdl-button--icon mdl-js-ripple-effect mdl-button--icon-large flex-noshrink" type="button" onclick="playPauseClick();" disabled>
-					<i class="material-icons icon-play">play_arrow</i>
-					<i class="material-icons icon-pause">pause</i>
-				</button>
-				<button class="mdl-button mdl-js-button mdl-button--icon mdl-js-ripple-effect mdl-button--icon-medium flex-noshrink" type="button" disabled>
-					<i class="material-icons">skip_next</i>
-				</button>
-			</div>
-			<div class="mdl-cell mdl-cell--5-col-desktop mdl-cell--3-col-tablet mdl-cell--1-col-phone flex player-height" style="justify-content: flex-end; align-items: center">
-				<button id="playlist-toggle-btn" class="mdl-button mdl-js-button mdl-button--icon mdl-js-ripple-effect mdl-button--icon-medium" type="button">
-					<i class="material-icons">queue_music</i>
-				</button>
+			<div id="results-wrapper" class="mdl-cell mdl-cell--12-col" style="display: none;">
+				<h3>Search results</h3>
+				<div id="results"></div>
 			</div>
 		</div>
 	</div>
 
+	<div id="bottom-wrapper" class="flex-noshrink">
+		<div id="playlist-wrapper" class="mdl-grid">
+			<div id="playlist" class="mdl-card mdl-shadow--2dp" style="display: none;">
+				<div class="mdl-card__title">
+					<h2 class="mdl-card__title-text">Playlist</h2>
+				</div>
+				<div class="mdl-card__supporting-text">
+					Coming soon...
+				</div>
+			</div>
+		</div>
+
+		<div id="player">
+			<div id="progress-bar" class="mdl-progress mdl-js-progress" tabindex="0" style="display: none;"></div>
+			<p class="time mdl-typography--caption"></p>
+			<div class="mdl-grid">
+				<div class="mdl-cell mdl-cell--5-col-desktop mdl-cell--3-col-tablet mdl-cell--4-col-phone player-height flex flex-align">
+					<a class="thumbnail" target="_blank" style="background-image: url(img/generic-song.png);"></a>
+					<div class="flex-vertical flex-grow" style="align-self: stretch; justify-content: space-around; align-items: flex-start; min-width: 0;">
+						<p class="title"></p>
+						<a class="source" target="_blank"></a>
+					</div>
+				</div>
+				<div class="mdl-cell mdl-cell--hide-desktop mdl-cell--hide-tablet mdl-cell--1-col-phone player-height flex flex-start flex-align">
+					<button class="download-btn mdl-button mdl-js-button mdl-button--icon mdl-js-ripple-effect mdl-button--icon-medium flex-noshrink" type="button" disabled>
+						<i class="material-icons">file_download</i>
+					</button>
+				</div>
+				<div id="player-controls" class="mdl-cell mdl-cell--2-col-desktop mdl-cell--2-col-tablet mdl-cell--2-col-phone player-height flex flex-align flex-center">
+					<button id="previous-btn" class="mdl-button mdl-js-button mdl-button--icon mdl-js-ripple-effect mdl-button--icon-medium flex-noshrink" type="button" disabled>
+						<i class="material-icons">skip_previous</i>
+					</button>
+					<button id="play-pause-btn" class="mdl-button mdl-js-button mdl-button--icon mdl-js-ripple-effect mdl-button--icon-large flex-noshrink" type="button" disabled>
+						<i class="material-icons icon-play">play_arrow</i>
+						<i class="material-icons icon-pause">pause</i>
+					</button>
+					<button id="next-btn" class="mdl-button mdl-js-button mdl-button--icon mdl-js-ripple-effect mdl-button--icon-medium flex-noshrink" type="button" disabled>
+						<i class="material-icons">skip_next</i>
+					</button>
+				</div>
+				<div class="mdl-cell mdl-cell--5-col-desktop mdl-cell--3-col-tablet mdl-cell--1-col-phone player-height flex flex-end flex-align">
+					<button class="download-btn mdl-cell--hide-phone mdl-button mdl-js-button mdl-button--icon mdl-js-ripple-effect mdl-button--icon-medium flex-noshrink" type="button" disabled>
+						<i class="material-icons">file_download</i>
+					</button>
+					<button id="playlist-toggle-btn" class="mdl-button mdl-js-button mdl-button--icon mdl-js-ripple-effect mdl-button--icon-medium flex-noshrink" type="button">
+						<i class="material-icons">queue_music</i>
+					</button>
+				</div>
+			</div>
+		</div>
+
+	</div>
 </div>
 
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
 <script defer src="https://code.getmdl.io/1.3.0/material.min.js"></script>
 <script src="js/main.js"></script>
 

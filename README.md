@@ -1,2 +1,2 @@
 # casty
-An user-friendly audio casting webserver
+An user-friendly audio casting web server

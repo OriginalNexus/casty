@@ -2,6 +2,9 @@ package com.nexus.casty;
 
 import com.jgoodies.forms.builder.FormBuilder;
 import com.jgoodies.forms.factories.Paddings;
+import com.nexus.casty.cache.CacheManager;
+import com.nexus.casty.player.CastyPlayer;
+import com.nexus.casty.server.CastyServer;
 import uk.co.caprica.vlcj.binding.LibVlc;
 import uk.co.caprica.vlcj.discovery.NativeDiscovery;
 
@@ -12,6 +15,7 @@ import java.awt.event.*;
 import java.io.IOException;
 import java.net.URI;
 import java.text.DecimalFormat;
+import java.util.ArrayList;
 
 public class CastyMain extends JFrame {
 
@@ -21,6 +25,7 @@ public class CastyMain extends JFrame {
 	private JFormattedTextField portField;
 	private JCheckBox showInTrayCheckBox;
 	private JTextField hostnameField;
+	private JFormattedTextField cacheSizeField;
 
 	private TrayIcon trayIcon;
 
@@ -32,17 +37,24 @@ public class CastyMain extends JFrame {
 	}
 
 	private void createUIComponents() {
-
 		statusLabel = new JLabel();
 		addressLabel = new JLabel();
 		toggleButton = new JButton();
 
+		hostnameField = new JTextField(CastyServer.getHostAddress(), 15);
+
 		DecimalFormat format = (DecimalFormat) DecimalFormat.getInstance();
 		format.setGroupingUsed(false);
+		format.setMaximumFractionDigits(0);
+
 		portField = new JFormattedTextField(format);
-		portField.setText("5555");
+		portField.setText(String.valueOf(CastyServer.DEFAULT_PORT));
 		portField.setColumns(5);
-		hostnameField = new JTextField("192.168.0.13", 15);
+
+		cacheSizeField = new JFormattedTextField(format);
+		cacheSizeField.setText(String.valueOf((int) (CacheManager.DEFAULT_CACHE_SIZE / 1024 / 1024)));
+		cacheSizeField.setColumns(5);
+
 		showInTrayCheckBox = new JCheckBox();
 	}
 
@@ -61,14 +73,16 @@ public class CastyMain extends JFrame {
 
 		JPanel settingsPanel = FormBuilder.create()
 				.columns("r:d, 4dlu, l:d")
-				.rows("d, 4dlu, d, 4dlu, d")
+				.rows("d, 4dlu, d, 4dlu, d, 4dlu, d")
 				.border(BorderFactory.createCompoundBorder(BorderFactory.createTitledBorder("Settings"), Paddings.DLU7))
-				.add("Port").xy(1, 1)
-				.add(portField).xy(3, 1)
-				.add("Hostname").xy(1, 3)
-				.add(hostnameField).xy(3, 3)
-				.add("Show in tray").xy(1, 5)
-				.add(showInTrayCheckBox).xy(3, 5)
+				.add("Hostname").xy(1, 1)
+				.add(hostnameField).xy(3, 1)
+				.add("Port").xy(1, 3)
+				.add(portField).xy(3, 3)
+				.add("Cache size (MB)").xy(1, 5)
+				.add(cacheSizeField).xy(3, 5)
+				.add("Show in tray").xy(1, 7)
+				.add(showInTrayCheckBox).xy(3, 7)
 				.build();
 
 		return FormBuilder.create()
@@ -80,27 +94,29 @@ public class CastyMain extends JFrame {
 				.build();
 	}
 
-	private void addEventListeners() {
+	private void addEventListeners()  {
 		toggleButton.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mouseClicked(MouseEvent e) {
 				if (!CastyServer.getInstance().isRunning()) {
-					// Get port and hostname
-					int port;
-					String hostname;
+					// Get settings
+					int port; String hostname; long cacheSize;
 					try {
 						port = Integer.valueOf(portField.getText());
-					} catch (IllegalArgumentException ex) {
-						JOptionPane.showMessageDialog(null, "Invalid port", "Casty", JOptionPane.ERROR_MESSAGE);
+						hostname = hostnameField.getText().isEmpty() ? CastyServer.getHostAddress() : hostnameField.getText();
+						cacheSize = Long.valueOf(cacheSizeField.getText()) * 1024 * 1024;
+					}
+					catch (NumberFormatException ex) {
+						JOptionPane.showMessageDialog(null, "Invalid settings\n" + ex.getMessage(), "Casty", JOptionPane.ERROR_MESSAGE);
 						return;
 					}
-					hostname = (hostnameField.getText().isEmpty() ? "localhost" : hostnameField.getText());
 
 					setUIState(UIState.STARTING);
 
 					(new SwingWorker<Void, Void>() {
 						@Override
 						protected Void doInBackground() throws Exception {
+							CastyPlayer.getInstance().getCache().setCacheSize(cacheSize);
 							CastyServer.getInstance().startServer(hostname, port);
 							return null;
 						}
@@ -110,6 +126,8 @@ public class CastyMain extends JFrame {
 							try {
 								get();
 							} catch (Exception e1) {
+								System.err.println("Could not start server");
+								e1.printStackTrace();
 								JOptionPane.showMessageDialog(null, "Could not start server\nReason: " + e1.getMessage(), "Casty", JOptionPane.ERROR_MESSAGE);
 								setUIState(UIState.STOPPED);
 								return;
@@ -155,19 +173,35 @@ public class CastyMain extends JFrame {
 				}
 			}
 		});
-	}
 
+	}
 
 	private CastyMain() {
 		super("Casty");
 		setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+
+		// Set Icons
+		try {
+			ArrayList<Image> icons = new ArrayList<>();
+			Image icon = ImageIO.read(getClass().getResource("/html/img/app.png"));
+			icons.add(icon.getScaledInstance(256, 256, Image.SCALE_SMOOTH));
+			icons.add(icon.getScaledInstance(128, 128, Image.SCALE_SMOOTH));
+			icons.add(icon.getScaledInstance(64, 64, Image.SCALE_SMOOTH));
+			icons.add(icon.getScaledInstance(48, 48, Image.SCALE_SMOOTH));
+			icons.add(icon.getScaledInstance(32, 32, Image.SCALE_SMOOTH));
+			icons.add(new ImageIcon(getClass().getResource("/html/img/app-16x16.png")).getImage());
+			setIconImages(icons);
+		} catch (IOException e) {
+			System.err.println("Could not set application icon");
+			e.printStackTrace();
+		}
 
 		setContentPane(buildUI());
 		setUIState(UIState.STOPPED);
 
 		pack();
 		setMinimumSize(getSize());
-		setSize(300, 300);
+		setSize(300, 350);
 		setLocationRelativeTo(null);
 
 		addEventListeners();
@@ -175,7 +209,7 @@ public class CastyMain extends JFrame {
 		// Tray Icon
 		if (SystemTray.isSupported()) {
 			try {
-				trayIcon = new TrayIcon(ImageIO.read(getClass().getResource("/icon.png")), "Casty");
+				trayIcon = new TrayIcon(ImageIO.read(getClass().getResource("/html/img/app-16x16.png")));
 				trayIcon.setImageAutoSize(true);
 				trayIcon.addMouseListener(new MouseAdapter() {
 					@Override
@@ -216,39 +250,43 @@ public class CastyMain extends JFrame {
 			case STOPPED:
 				statusLabel.setText("Stopped");
 				addressLabel.setText("None");
+				addressLabel.setCursor(null);
 				toggleButton.setText("Start server");
 				toggleButton.setEnabled(true);
 				portField.setEnabled(true);
 				hostnameField.setEnabled(true);
+				cacheSizeField.setEnabled(true);
 				break;
 			case STARTING:
 				statusLabel.setText("Starting...");
-				addressLabel.setText("None");
-				toggleButton.setText("Start server");
 				toggleButton.setEnabled(false);
 				portField.setEnabled(false);
 				hostnameField.setEnabled(false);
+				cacheSizeField.setEnabled(false);
 				break;
 			case RUNNING:
 				statusLabel.setText("Running");
 				toggleButton.setText("Stop server");
 				addressLabel.setText(CastyServer.getInstance().getAddress());
+				addressLabel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 				toggleButton.setEnabled(true);
-				portField.setEnabled(false);
-				hostnameField.setEnabled(false);
 				break;
 			case STOPPING:
 				statusLabel.setText("Stopping...");
-				toggleButton.setText("Stop server");
 				toggleButton.setEnabled(false);
-				portField.setEnabled(false);
-				hostnameField.setEnabled(false);
 				break;
 		}
 	}
 
 	public static void main(String[] args) {
-		System.out.println("Casty 1.0.0");
+		// Print version
+		Package p = CastyMain.class.getPackage();
+		if (p != null && p.getImplementationTitle() != null && p.getImplementationVersion() != null) {
+			System.out.println(p.getImplementationTitle() + " " +  p.getImplementationVersion());
+		}
+		else {
+			System.out.println("Casty development version");
+		}
 
 		// Set look and feel
 		try {

@@ -1,45 +1,59 @@
 package com.nexus.casty;
 
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
 import java.io.*;
+import java.math.BigInteger;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
-class Utils {
-	static Map<String, String> parseQuery(String query) {
-		Map<String, String> map = new HashMap<>();
-		for (String pair : query.split("&")) {
-			String [] array = pair.split("=");
-			if (array.length != 2) continue;
-			map.put(array[0], array[1]);
-		}
+public class Utils {
 
+	public static Map<String, String> parseQuery(@Nullable String query) {
+		Map<String, String> map = new HashMap<>();
+		if (query != null) {
+			for (String pair : query.split("&")) {
+				String[] array = pair.split("=");
+				if (array.length != 2) continue;
+				map.put(array[0], array[1]);
+			}
+		}
 		return map;
 	}
 
-	static String downloadURLToString(String url) throws IOException {
-		int len, BUF_LEN = 1024 * 1024;
-		StringWriter output = new StringWriter();
-
-		InputStreamReader input = new InputStreamReader(new URL(url).openStream(), "UTF-8");
-
-		char[] buf = new char[BUF_LEN];
-		while ((len = input.read(buf, 0, BUF_LEN)) != -1) output.write(buf, 0, len);
-
-		return output.toString();
+	public static void streamCopy(@NotNull InputStream in, @NotNull OutputStream out) throws IOException {
+		int count, BUFFER_SIZE = 1024 * 1024;
+		byte[] buffer = new byte[BUFFER_SIZE];
+		while ((count = in.read(buffer, 0, BUFFER_SIZE)) != -1) out.write(buffer, 0, count);
 	}
 
-	static void downloadURLToFile(String url, File file) throws IOException {
-		int len, BUF_LEN = 1024 * 1024;
-
-		System.out.print("Downloading \"" + url + "\"...");
-
-		InputStream input = new URL(url).openStream();
-		FileOutputStream output = new FileOutputStream(file);
-
-		byte[] buf = new byte[BUF_LEN];
-		while ((len = input.read(buf, 0, BUF_LEN)) != -1) output.write(buf, 0, len);
-
-		System.out.println("OK");
+	public static String streamToString(@NotNull InputStream input) throws IOException {
+		ByteArrayOutputStream output = new ByteArrayOutputStream();
+		streamCopy(input, output);
+		return output.toString("UTF-8");
 	}
+
+	public static void fileToStream(@NotNull File file, @NotNull OutputStream output) throws IOException {
+		try (FileInputStream fs = new FileInputStream(file)) {
+			streamCopy(fs, output);
+		}
+	}
+
+	public static void urlToFile(@NotNull String url, @NotNull File file) throws IOException {
+		try (FileOutputStream fs = new FileOutputStream(file)) {
+			streamCopy(new URL(url).openStream(), fs);
+		}
+	}
+
+	public static String stringToBase36(@NotNull String s) {
+		return new BigInteger(s.getBytes(StandardCharsets.UTF_8)).toString(36);
+	}
+
+	public static String base36ToString(@NotNull String s) {
+		return new String(new BigInteger(s.toLowerCase(), 36).toByteArray(), StandardCharsets.UTF_8);
+	}
+
 }

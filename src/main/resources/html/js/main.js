@@ -1,207 +1,341 @@
 // Global variables
 var windowFocused = true;
-var length = 0;
+var songCount = 0;
+var songLength = -1;
+var songPercent = -1;
+var lasSongPercent = -1;
+var progressBarValue = 0;
+var State = {
+	"STOPPED": 0,
+	"PLAYING": 1,
+	"PAUSED": 2
+}
+var playerState = State.STOPPED;
 
-// URL input
-function inputChanged() {
-	$("#input-textfield-group").removeClass("is-invalid");
-}
-function playBtnClick() {
-	var url = $("#input-textfield").val();
-	if (url === "") {
-		$("#input-textfield-group").addClass("is-invalid");
-		return;
-	}
-	playUrl(url);
-}
-
-function playUrl(url) {
-	$.post("/player/control", { action: "playurl", url: url}, function(data) { updateInfo(); });
-}
 
 function searchResultClick(target, url) {
-	playUrl(url);
+	if ($("#results .mdl-spinner.is-active").length > 0) return;
+	var spinner = $(target).find(".mdl-spinner");
+	spinner.addClass("is-active");
+
+	$.post("/player/control", { action: "playurl", url: url})
+	.always(function(data) {
+		spinner.removeClass("is-active");
+	});
 }
 
 function searchBtnClick() {
-	var query = $("#input-textfield").val();
-	if (query === "") {
-		$("#input-textfield-group").addClass("is-invalid");
+	var query = $("#search-textfield").val();
+	if (query === "") return;
+
+	if (query.startsWith("http://") || query.startsWith("https://")) {
+		$.post("/player/control", { action: "playurl", url: query});
 		return;
 	}
-	$("#results-wrapper").fadeOut();
-	$.getJSON("/player/results?q=" + encodeURI(query), null, function(results) {
+
+	var overlay = $("#content-overlay")
+	var spinner = overlay.find(".mdl-spinner");
+	var resultsWrapper = $("#results-wrapper");
+	var results = $("#results");
+
+	if (spinner.hasClass("is-active")) return;
+	spinner.addClass("is-active");
+
+	overlay.fadeIn();
+
+	$.getJSON("/results?q=" + encodeURI(query), null, function(data) {
+		resultsWrapper.hide();
 		if (results) {
-			var resultsDiv = $("#results");
-			resultsDiv.empty();
-			$.each(results, function(id, title) {
-				resultsDiv.append("<div class='search-result' onClick='searchResultClick(this, \"https://www.youtube.com/watch?v=" + id  + "\");'>" +
-						"<p class='thumbnail' style='background-image: url(\"http://img.youtube.com/vi/" + id + "/mqdefault.jpg\");'></p>" +
-						"<p>" + title + "</p>" +
-					"</div>");
+			results.empty();
+			$.each(data, function(i, result) {
+				var resultDiv = $("<div>", {
+					"class": "search-result flex flex-align",
+					click: function() {
+						searchResultClick(this, "https://www.youtube.com/watch?v=" + result["id"]);
+					}
+				}).append($("<p>", {
+					"class": "thumbnail",
+					css: {
+						"background-image": "url(\"" + result["thumbnail"] + "\")"
+					}
+				}), $("<p>", {
+					text: result["title"]
+				}), $("<div>", {
+					"class": "spinner"
+				}).append($("<div>", {
+					"class": "mdl-spinner mdl-js-spinner mdl-spinner--single-color"
+				})));
+				componentHandler.upgradeElement(resultDiv.find(".mdl-spinner")[0]);
+				results.append(resultDiv);
 			});
-			$("#results-wrapper").fadeIn();
+			resultsWrapper.fadeIn();
 		}
+	})
+	.always(function() {
+		overlay.hide();
+		spinner.removeClass("is-active");
 	});
 }
 
-// Player
+
 function playPauseClick() {
-	$.post("/player/control", { action: "playpause"}, function(data) {  $("#play-pause-btn").toggleClass("pause"); });
-}
-function setProgressBar(percent) {
-	if (percent < 0) percent = 0;
-	if (percent > 1) percent = 1;
-	if (!$("#progress-bar").hasClass("is-dragged")) {
-		document.getElementById("progress-bar").MaterialSlider.change(percent * 100);
-	}
-	if (length > 0) $("#player .time").text(Math.floor(length * percent / 60000) + ":"
-			+ (Math.floor(length * percent / 1000) % 60 < 10 ? "0" : "") + Math.floor(length * percent / 1000) % 60 + "/"
-			+ Math.floor(length / 60000) + ":"
-			+ (Math.floor(length / 1000) % 60 < 10 ? "0" : "") + Math.floor(length / 1000) % 60);
-	else $("#player .time").text("");
+	$.post("/player/control", { action: "playpause"}, function(data) {
+		if (playerState == State.PLAYING) playerState = State.PAUSED;
+		else playerState = State.PLAYING;
+		$("#play-pause-btn").toggleClass("pause");
+	});
 }
 
-// Server update
+function nextClick() {
+	$.post("/player/control", { action: "next"});
+}
+
+function previousClick() {
+	$.post("/player/control", { action: "previous"}, function(data) {
+		songPercent = 0;
+	});
+}
+
+function updateProgressBar(lastTime) {
+	var time = Date.now();
+	var progressBar = $("#progress-bar");
+
+	if (!windowFocused);
+	else if (songPercent < 0) {
+		progressBar.fadeOut();
+		songPercent = -1;
+		lasSongPercent = -1;
+	}
+	else {
+		if (lastTime && playerState == State.PLAYING && songLength > 0) {
+			songPercent += (time - lastTime) * 1.0 / songLength;
+		}
+		if (songPercent > 1) songPercent = 1;
+
+		if (lasSongPercent != songPercent) {
+			lasSongPercent = songPercent;
+
+			progressBar.fadeIn();
+			if (!progressBar.hasClass("is-dragged")) {
+				progressBar[0].MaterialProgress.setProgress(songPercent * 100);
+			}
+			if (songLength > 0) {
+				var totalMin = Math.floor(songLength / 60000);
+				var totalSec = Math.floor(songLength / 1000) % 60;
+				var currentMin = Math.floor(songLength * songPercent / 60000);
+				var currentSec = Math.floor(songLength * songPercent / 1000) % 60;
+				var totalText =  totalMin + ":" + (totalSec < 10 ? "0" : "") + totalSec;
+				var currentText = currentMin + ":" + (currentSec < 10 ? "0" : "") + currentSec;
+				var timeText = currentText + " / " + totalText;
+				$("#player .time").text(timeText);
+			}
+			else $("#player .time").text("");
+		}
+	}
+
+	if (lastTime) window.setTimeout(function() { updateProgressBar(time); }, 250);
+}
+
+function sendPosition() {
+	$.post("/player/control", { action: "position", percent: songPercent });
+	updateProgressBar();
+}
+
+function downloadClick() {
+	var url = $(this).data("target");
+	if (url != "") document.location.href = url;
+}
+
+
 function updateInfo() {
-	$.getJSON("/player/info", null, function(info) {
-		var title = "Unknown title";
-		var source = "#";
-		var sourceName = "Unknown source";
-		var thumbnail = "default-thumb.png";
-		var thumbnailFull = thumbnail;
-		if (!info) {
-			title = "";
-			source = "";
-			sourceName = "";
-			thumbnail = "";
-			thumbnailFull = "";
-			length = 0;
+	$.getJSON("/song/info", null, function(info) {
+		var title = "", source = "", sourceName = "", thumbnail = "img/generic-song.png", thumbnailFull = "", download = "";
+		if (info) {
+			title = info.hasOwnProperty("title") ? info.title : "Unknown title";
+			source = info.hasOwnProperty("source") ? info.source : "#";
+			sourceName = info.hasOwnProperty("sourceName") ? info.sourceName : "Unknown source";
+			thumbnail = info.hasOwnProperty("thumbnail") ? info.thumbnail : "img/generic-song.png";
+			thumbnailFull = info.hasOwnProperty("thumbnailFull") ? info.thumbnailFull : "";
+			download = info.hasOwnProperty("download") ? info.download : "";
+		}
+
+		$("#player .title").text(title);
+		$("#player .source").text(sourceName).attr("href", source);
+
+		var thumb = $("#player .thumbnail").css("background-image", "url('" + thumbnail + "')");
+		if (thumbnailFull != "") thumb.attr("href", thumbnailFull);
+		else thumb.removeAttr("href");
+
+		var downloadBtn = $(".download-btn");
+		if (download === "") {
+			downloadBtn.prop("disabled", true);
+			downloadBtn.data("target", "");
 		}
 		else {
-			if (info.hasOwnProperty("title")) {
-				title = info.title;
-			}
-			if (info.hasOwnProperty("source")) {
-				source = info.source;
-			}
-			if (info.hasOwnProperty("sourceName")) {
-				sourceName = info.sourceName;
-			}
-			if (info.hasOwnProperty("thumbnail")) {
-				thumbnail = info.thumbnail;
-			}
-			if (info.hasOwnProperty("thumbnailFull")) {
-            	thumbnailFull = info.thumbnailFull;
-            }
-            if (info.hasOwnProperty("length")) {
-            	length = info.length;
-            }
-        }
-		$("#player .title").text(title);
-		$("#player .source").text(sourceName);
-		$("#player .source").attr("href", source);
-		$("#player .thumbnail").css("background-image", "url('" + thumbnail + "')");
-		$("#player .thumbnail").attr("href", thumbnailFull);
+			downloadBtn.data("target", download);
+			downloadBtn.prop("disabled", false);
+		}
 	});
 }
+
 function updateStatus() {
 	if (!windowFocused) {
 		$(window).one("focus", function(event) { updateStatus(); })
 		return;
 	}
 
-	$("#offline-message").hide();
+	$("#offline-wrapper").hide();
 
 	$.getJSON("/player/status", null, function(status) {
 		var btn = $("#play-pause-btn");
-		var state;
-		if (status.hasOwnProperty("state")) state = status.state;
+		var newSongCount = 0;
+		if (status) {
+			playerState = status.hasOwnProperty("state") ? status.state : State.STOPPED;
+			songPercent = status.hasOwnProperty("percent") ? status.percent : -1;
+			newSongCount = status.hasOwnProperty("songCount") ? status.songCount : songCount;
+		}
+		else {
+			playerState = State.STOPPED;
+			songPercent = -1;
+		}
 
-		if (state === "PLAYING") {
+		if (playerState == State.PLAYING) {
 			if (!btn.hasClass("pause")) btn.addClass("pause");
 		}
 		else {
 			btn.removeClass("pause");
 		}
+		if (playerState == State.STOPPED) $("#player-controls button").prop("disabled", true);
+		else $("#player-controls button").prop("disabled", false);
 
-		if (status.hasOwnProperty("percent") && status.percent >= 0) {
-			setProgressBar(status.percent);
-			$("#player .progress-wrapper").show();
-		}
-		else {
-			$("#player .progress-wrapper").hide();
+		if (songCount != newSongCount) {
+			updateInfo();
+			songLength = -1;
+			songCount = newSongCount;
 		}
 
-		$("#player-controls button").prop("disabled", false);
+		if (status && songLength == -1) {
+			songLength = -2;
+			$.get("/song/length", null, function(length) {
+				if (length > 0) songLength = length;
+				else songLength = -1;
+			}).fail(function() {
+				songLength = -1;
+			});
+		}
 
 	}).done(function() {
-		window.setTimeout(function() { updateStatus(); }, 1000);
+		window.setTimeout(function() { updateStatus(); }, 1500);
 	}).fail(function() {
 		$("#player-controls button").prop("disabled", true);
-		$("#player .progress-wrapper").hide();
-		$("#offline-message").show();
+		songPercent = -1;
+		$("#offline-wrapper").show();
 	});
-
-	updateInfo();
 }
 
-
+// Main function
 $(document).ready(function() {
 	// Window focus
 	$(window).focus(function() { windowFocused = true; });
 	$(window).blur(function() { windowFocused = false; });
 
+	// Click events
+	$("#search-btn").click(searchBtnClick);
+	$("#connection-retry-btn").click(updateStatus);
+	$("#play-pause-btn").click(playPauseClick);
+	$("#next-btn").click(nextClick);
+	$("#previous-btn").click(previousClick);
+	$(".download-btn").click(downloadClick);
+
 	// Input
-	$("#input-textfield").keyup(function(event){
-        if(event.keyCode == 13){
-            $("#input-textfield-group + button").click();
-        }
+	$("#search-textfield").keyup(function(event) {
+        if(event.keyCode == 13) $("#search-btn").click();
     });
 
 	// Playlist
 	var playlist = $("#playlist");
+	var playlistWrapper = $("#playlist-wrapper");
 	playlist.on("animationend webkitAnimationEnd", function(event) {
-		if (!playlist.hasClass("playlist-opened")) {
+		if (!playlistWrapper.hasClass("playlist-opened")) {
 			playlist.hide();
 		}
 	});
 	$("#playlist-toggle-btn").click(function() {
-		playlist.toggleClass("playlist-opened");
-		if (playlist.hasClass("playlist-opened")) {
-			playlist.show();
-		}
+		playlistWrapper.toggleClass("playlist-opened");
+		if (playlistWrapper.hasClass("playlist-opened")) playlist.show();
 	});
 	$(document).mouseup(function (e) {
 		// Hide playlist if user clicks elsewhere
-		var container = $("#player-container");
+		var container = $("#bottom-wrapper");
 		if (!container.is(e.target) && container.has(e.target).length === 0) {
-			playlist.removeClass("playlist-opened");
+			playlistWrapper.removeClass("playlist-opened");
 		}
 	});
 
 	// Progress bar
 	var progressBar = $("#progress-bar");
-	progressBar.hover(function() { progressBar.focus(); }, function() { progressBar.blur(); });
-	progressBar.on("mousedown touchstart", function(event) {
-		$(this).addClass("is-dragged");
-	});
-	progressBar.on("mouseup touchend", function(event) {
-		if ($(this).hasClass("is-dragged")) {
-			$(this).removeClass("is-dragged");
-			$.post("/player/control", { action: "position", percent: progressBar.val() / 100.0 });
+	function progressBarEvent(event) {
+		if (event.type == "mousedown" || event.type == "touchstart") {
+			progressBar.addClass("is-dragged");
+			$(document).on("mousemove mouseup", progressBarEvent);
+			event.preventDefault();
 		}
-	});
+		if (progressBar.hasClass("is-dragged")) {
+       		var newPercent, x;
+       		if (event.type.substr(0, 5) == "touch") x = event.originalEvent.changedTouches[0].clientX;
+       		else x = event.pageX;
+
+       		newPercent = (x - progressBar.offset().left) / progressBar.width();
+       		newPercent = newPercent >= 0 ? (newPercent <= 1 ? newPercent : 1) : 0;
+        	progressBar[0].MaterialProgress.setProgress(newPercent * 100);
+
+        	if (event.type == "mouseup" || event.type == "touchend") {
+        		songPercent = newPercent;
+        		progressBar.removeClass("is-dragged");
+        		$(document).off("mousemove mouseup", progressBarEvent);
+        		sendPosition();
+        	}
+        	event.preventDefault();
+        }
+	}
+	progressBar.on("mousedown touchstart touchmove touchend", progressBarEvent);
 
 	// Hotkeys
-	$(document).on('keypress', function(e) {
+	var keyDown = {}; // Used to keep track of keys held down
+	$(document).keydown(function(e) {
+		if (keyDown[e.which]) return;
+		keyDown[e.which] = true;
+
 		var tag = e.target.tagName.toLowerCase();
-		if ( e.which === 32 && tag != 'input' && tag != 'textarea' && !$("#play-pause-btn").prop("disabled")) {
-			$("#play-pause-btn").click();
+		var enterCode = 32, zeroCode = 48, leftCode = 37, rightCode = 39;
+
+		if (tag != "input" && tag != "textarea") {
+			if (!$("#play-pause-btn").prop("disabled")) {
+				if (e.which === enterCode) {
+					$("#play-pause-btn").click();
+					event.preventDefault();
+				}
+				else if (e.which >= zeroCode && e.which <= zeroCode + 9) {
+					songPercent = (e.which - zeroCode) / 10.0;
+					sendPosition();
+				}
+				else if (e.which === leftCode || e.which === rightCode) {
+					var delta = 0.05;
+					if (songLength > 0) delta = 5000.0 / songLength;
+					if (e.which === leftCode) delta *= -1;
+					songPercent += delta;
+					songPercent = (songPercent < 0) ? 0 : ((songPercent > 1) ? 1 : songPercent);
+					sendPosition();
+				}
+			}
 		}
+	});
+	$(document).keyup(function(e) {
+		delete keyDown[e.which];
 	});
 
 	// Update
 	updateStatus();
+	updateProgressBar(Date.now());
 
 });
