@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.nexus.casty.cache.CacheFile;
 import com.nexus.casty.player.CastyPlayer;
 import com.nexus.casty.Utils;
+import com.nexus.casty.player.PlaylistItem;
 import com.nexus.casty.song.SongData;
 import com.originalnexus.ytd.YTSearch;
 import com.sun.net.httpserver.HttpExchange;
@@ -39,10 +40,9 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
 		String data = Utils.streamToString(httpExchange.getRequestBody());
 		Map<String, String> query = Utils.parseQuery(data);
 
+		boolean valid = true, success = true;
 		switch (uri.getPath()) {
 			case "/player/control":
-				boolean valid = true, success = true;
-
 				String action = query.get("action");
 				if (action == null) {
 					responseMsg = "Missing action";
@@ -65,23 +65,80 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
 						case "position":
 							success = CastyPlayer.getInstance().setPosition(Float.valueOf(query.get("percent")));
 							break;
+						case "playlist":
+							int index = -1;
+							if (query.get("index") != null) {
+								try {
+									index = Integer.valueOf(query.get("index"));
+								} catch (NumberFormatException ignored) {}
+							}
+							if (index < 0) {
+								responseMsg = "Invalid or missing index";
+								valid = false;
+							}
+							else success = CastyPlayer.getInstance().playlistPlayItem(index);
+							break;
 						default:
 							responseMsg = "Invalid action";
 							valid = false;
 					}
 				}
 
-				if (!valid) {
-					responseCode = 400;
+				break;
+			case "/playlist/add":
+				String url = query.get("url");
+				if (url == null) {
+					responseMsg = "Missing url";
+					valid = false;
 				}
-				else if (!success) {
-					responseMsg = "Request FAILED";
-					responseCode = 500;
+				else {
+					String title = query.get("title");
+					if (title == null) title = url;
+
+					PlaylistItem item = new PlaylistItem();
+					item.url = URLDecoder.decode(url, "UTF-8");
+					item.title = URLDecoder.decode(title, "UTF-8");
+					success = CastyPlayer.getInstance().getPlaylist().addItem(item);
 				}
+				break;
+			case "/playlist/remove":
+				int index = -1;
+				if (query.get("index") != null) {
+					try {
+						index = Integer.valueOf(query.get("index"));
+					} catch (NumberFormatException ignored) {}
+				}
+
+				if (index < 0) {
+					responseMsg = "Invalid or missing index";
+					valid = false;
+				}
+				else {
+					success = CastyPlayer.getInstance().getPlaylist().removeItem(index);
+				}
+				break;
+			case "/playlist/control":
+				String repeat = query.get("repeat");
+				if (repeat != null) {
+					if (repeat.toLowerCase().equals("true")) CastyPlayer.getInstance().getPlaylist().setRepeat(true);
+					else if (repeat.toLowerCase().equals("false")) CastyPlayer.getInstance().getPlaylist().setRepeat(false);
+					else success = false;
+				}
+				break;
+			case "/playlist/cache":
+				success = CastyPlayer.getInstance().loadCachePlaylist();
 				break;
 			default:
 				responseMsg = "Not Found";
 				responseCode = 404;
+		}
+
+		if (!valid) {
+			responseCode = 400;
+		}
+		else if (!success) {
+			responseMsg = "Request FAILED";
+			responseCode = 500;
 		}
 
 		byte[] response = responseMsg.getBytes(StandardCharsets.UTF_8);
@@ -115,6 +172,9 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
 			case "/results":
 				String query = (queries.get("q") == null) ? "" : queries.get("q");
 				response = gson.toJson(YTSearch.performSearch(query));
+				break;
+			case "/playlist/list":
+				response = gson.toJson(CastyPlayer.getInstance().getPlaylist().toArray());
 				break;
 			default:
 				handleFile(httpExchange);

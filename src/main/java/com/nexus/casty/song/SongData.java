@@ -8,4 +8,10 @@ public class SongData extends SongInfo {
 
 	public SongData() {}
 
+	public SongData(SongData songData) {
+		super(songData);
+		this.specialDemux = songData.specialDemux;
+		this.container = songData.container;
+		this.filename = songData.filename;
+	}
 }

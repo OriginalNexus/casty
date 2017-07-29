@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
 
 public class CacheManager {
 
@@ -48,7 +49,7 @@ public class CacheManager {
 				if (i < 0 || i == f.getName().length() - 1) continue;
 
 				String prefix = f.getName().substring(0, i);
-				if (!isPrefixValid(prefix)) continue;
+				if (isPrefixInvalid(prefix)) continue;
 
 				String hashedKey = f.getName().substring(i + 1);
 				String key = Utils.base36ToString(hashedKey);
@@ -77,7 +78,7 @@ public class CacheManager {
 	}
 
 	public @Nullable CacheFile getCacheFile(String prefix, String id) {
-		if (!isPrefixValid(prefix)) return null;
+		if (isPrefixInvalid(prefix)) return null;
 		CacheFile file;
 		synchronized (this) {
 			file = cacheMap.compute(prefix + id, (k, f) -> {
@@ -126,8 +127,25 @@ public class CacheManager {
 		}
 	}
 
+	public <T> ArrayList<T> getDataArray(Function<T, T> copyFunction) {
+		ArrayList<T> arrayList = new ArrayList<>();
+		synchronized (this) {
+			for (Map.Entry<String, CacheFile> e : cacheMap.entrySet()) {
+				CacheFile f = e.getValue();
+				f.getLocks().read();
+				try {
+					if (f.exists() && f.isFile() && f.getData() != null) {
+						arrayList.add(copyFunction.apply(f.getData()));
+					}
+				} finally {
+					f.getLocks().readRelease();
+				}
+			}
+		}
+		return arrayList;
+	}
 
-	private boolean isPrefixValid(String prefix) {
+	private boolean isPrefixInvalid(String prefix) {
 		boolean valid = false;
 		for (String p : prefixes) {
 			if (prefix.equals(p)) {
@@ -135,7 +153,7 @@ public class CacheManager {
 				break;
 			}
 		}
-		return valid;
+		return !valid;
 	}
 
 	private void cleanCache() {

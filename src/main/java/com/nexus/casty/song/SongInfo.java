@@ -10,4 +10,12 @@ public class SongInfo {
 
 	SongInfo() {}
 
+	SongInfo(SongData songInfo) {
+		this.title = songInfo.title;
+		this.source = songInfo.source;
+		this.sourceName = songInfo.sourceName;
+		this.thumbnail = songInfo.thumbnail;
+		this.thumbnailFull = songInfo.thumbnailFull;
+		this.download = songInfo.download;
+	}
 }

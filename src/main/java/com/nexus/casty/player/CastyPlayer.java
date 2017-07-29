@@ -19,6 +19,7 @@ import uk.co.caprica.vlcj.player.MediaPlayerFactory;
 import java.io.*;
 import java.nio.file.Files;
 import java.util.*;
+import java.util.stream.Collectors;
 
 
 public class CastyPlayer {
@@ -44,6 +45,8 @@ public class CastyPlayer {
 	private Song currentSong;
 	private long songCount = 0;
 
+	private final Playlist playlist = new Playlist();
+
 	private CastyPlayer() {
 		try {
 			Gson gson = new GsonBuilder().setPrettyPrinting().create();
@@ -67,12 +70,6 @@ public class CastyPlayer {
 		if (song == null || !playSong(song)) {
 			System.err.println("Failed to play URL: " + url);
 			return false;
-		}
-		synchronized (this) {
-			if (currentSong != null && currentSong.nextUrl != null && !currentSong.nextUrl.isEmpty()) {
-				final String urlCopy = currentSong.nextUrl;
-				new Thread(() -> getSongFromUrl(urlCopy)).start();
-			}
 		}
 		return true;
 	}
@@ -152,7 +149,7 @@ public class CastyPlayer {
 						System.err.println("No appropriate format found for url");
 					}
 				} catch (Exception e) {
-					// Try to delete file since it could be corrupt
+					// Try to delete the file since it could be corrupt
 					try {
 						if (f.exists()) Files.delete(f.toPath());
 					} catch (Exception ignored) {}
@@ -164,19 +161,16 @@ public class CastyPlayer {
 
 			if (f.exists() && f.isFile()) {
 				f.updateAccessTime();
-				if (isNew) cache.saveData();
+				if (isNew) {
+					cache.saveData();
+					cache.requestCacheClean();
+				}
 
 				song = new Song();
 				song.file = f;
-				song.isNew = isNew;
 				song.data = f.getData();
 				song.streamUrl = song.file.getPath();
-				try {
-					song.nextUrl = ytExtractor.getNextVideoUrl();
-				} catch (IOException e) {
-					System.err.println("Could not extract next song");
-					e.printStackTrace();
-				}
+				song.ytExtractor = ytExtractor;
 				return song;
 			}
 
@@ -193,6 +187,7 @@ public class CastyPlayer {
 		Song song = new Song();
 		song.streamUrl = url;
 		song.file = null;
+		song.ytExtractor = null;
 		song.data = new SongData();
 		song.data.title = url;
 		song.data.source = url;
@@ -209,7 +204,6 @@ public class CastyPlayer {
 			if (currentSong != null && currentSong.file != null) currentSong.file.getLocks().readRelease();
 			String lastStreamUrl = (currentSong != null) ? currentSong.streamUrl : null;
 			currentSong = null;
-			if (song.isNew) cache.requestCacheClean();
 
 			if (song.streamUrl != null) {
 				player = playerFactory.newHeadlessMediaPlayer();
@@ -221,6 +215,7 @@ public class CastyPlayer {
 				});
 				boolean demux = (song.data != null) && song.data.specialDemux;
 				success = player.startMedia(song.streamUrl, demux ? "demux=avformat" : "", "http-reconnect");
+
 				if (success) {
 					if (lastStreamUrl == null || !lastStreamUrl.equals(song.streamUrl)) songCount++;
 					currentSong = song;
@@ -230,7 +225,7 @@ public class CastyPlayer {
 			System.err.println("Player internal error");
 			e.printStackTrace();
 		} finally {
-			if  (!success && song.file != null)  song.file.getLocks().readRelease();
+			if (!success && song.file != null) song.file.getLocks().readRelease();
 		}
 
 		return success;
@@ -248,15 +243,36 @@ public class CastyPlayer {
 	}
 
 	public synchronized boolean next() {
-		if (currentSong == null || currentSong.nextUrl == null || currentSong.nextUrl.isEmpty()) return false;
-		final String url = currentSong.nextUrl;
+		String url;
+
+		// Check playlist first
+		PlaylistItem item = playlist.next();
+		if (item != null) {
+			url = item.url;
+		}
+		else {
+			if (currentSong == null || currentSong.ytExtractor == null) return false;
+			try {
+				url = currentSong.ytExtractor.getNextVideoUrl();
+			} catch (IOException e) {
+				System.err.println("Could extract next url for current song");
+				e.printStackTrace();
+				return false;
+			}
+		}
 		new Thread(() -> playUrl(url)).start();
-		currentSong.nextUrl = null;
 		return true;
 	}
 
 	public synchronized boolean previous() {
-		return setPosition(0);
+		if (player == null) return false;
+		if (getCurrentSongLength() * player.getPosition() > 5000) return setPosition(0);
+		PlaylistItem item = playlist.previous();
+		if (item != null) {
+			new Thread(() -> playUrl(item.url)).start();
+			return true;
+		}
+		else return setPosition(0);
 	}
 
 	public synchronized void reset() {
@@ -265,24 +281,31 @@ public class CastyPlayer {
 		if (currentSong != null && currentSong.file != null) currentSong.file.getLocks().readRelease();
 		currentSong = null;
 		songCount = 0;
+		playlist.reset();
 		cache.requestCacheClean();
 	}
 
 	public synchronized Status getStatus() {
-		if (player == null) return null;
 		Status status = new Status();
-		if (player.isPlaying()) {
-			status.state = PlayerState.PLAYING;
-			status.percent = player.getPosition();
-		}
-		else if (player.getMediaState() == libvlc_state_t.libvlc_Paused) {
-			status.state = PlayerState.PAUSED;
-			status.percent = player.getPosition();
+		if (player != null) {
+			if (player.isPlaying()) {
+				status.state = PlayerState.PLAYING;
+				status.percent = player.getPosition();
+			}
+			else if (player.getMediaState() == libvlc_state_t.libvlc_Paused) {
+				status.state = PlayerState.PAUSED;
+				status.percent = player.getPosition();
+			}
+			else {
+				status.state = PlayerState.STOPPED;
+			}
+			status.songCount = songCount;
 		}
 		else {
 			status.state = PlayerState.STOPPED;
+			status.songCount = 0;
 		}
-		status.songCount = songCount;
+		status.playlist = playlist.getStatus();
 		return status;
 	}
 
@@ -303,6 +326,34 @@ public class CastyPlayer {
 
 	public CacheManager getCache() {
 		return cache;
+	}
+
+	public Playlist getPlaylist() {
+		return playlist;
+	}
+
+	public boolean playlistPlayItem(int index) {
+		PlaylistItem item = playlist.setIndex(index);
+		if (item == null) return false;
+		new Thread(() -> playUrl(item.url)).start();
+		return true;
+	}
+
+	public boolean loadCachePlaylist() {
+		ArrayList<SongData> array = cache.getDataArray(SongData::new);
+		ArrayList<PlaylistItem> list;
+		list = array.stream()
+				.map(songData -> {
+					PlaylistItem item = new PlaylistItem();
+					item.url = songData.source;
+					item.title = songData.title;
+					return item;
+				})
+				.sorted(Comparator.comparing(item -> item.title))
+				.collect(Collectors.toCollection(ArrayList::new));
+
+		playlist.load(list);
+		return true;
 	}
 
 }
