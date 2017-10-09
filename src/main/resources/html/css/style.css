@@ -308,6 +308,24 @@ body {
 	transform: scale(1.5);
 }
 
+/* Volume */
+#volume-wrapper {
+	z-index: 2;
+	top: -128px;
+	left: -48px;
+	position: relative;
+	height: 200px;
+	width: 48px;
+	margin-right: -48px;
+	border-radius: 2px;
+	background-color: #fff;
+}
+
+#volume-slider-wrapper {
+	transform: rotate(-90deg) translate(-92px, -76px);
+	width: 200px;
+}
+
 
 /*** Media queries ***/
 

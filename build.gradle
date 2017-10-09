@@ -4,7 +4,7 @@ apply plugin: 'idea'
 
 sourceCompatibility = 1.8
 group = 'com.nexus'
-version = '1.2.0'
+version = '1.2.1'
 description = 'A user-friendly audio casting web server'
 mainClassName = 'com.nexus.casty.CastyMain'
 

@@ -34,6 +34,7 @@ public class CastyPlayer {
 	}
 
 	private static final String YOUTUBE_PREFIX = "yt";
+	private static final int DEFAULT_VOLUME = 80;
 
 	private static final CastyPlayer ourInstance = new CastyPlayer();
 
@@ -44,6 +45,7 @@ public class CastyPlayer {
 
 	private Song currentSong;
 	private long songCount = 0;
+	private int volume = DEFAULT_VOLUME;
 
 	private final Playlist playlist = new Playlist();
 
@@ -199,7 +201,11 @@ public class CastyPlayer {
 	private synchronized boolean playSong(@NotNull Song song) {
 		boolean success = false;
 		try {
-			if (player != null) player.release();
+			if (player != null) {
+				player.stop();
+				player.setVolume(DEFAULT_VOLUME);
+				player.release();
+			}
 			player = null;
 			if (currentSong != null && currentSong.file != null) currentSong.file.getLocks().readRelease();
 			String lastStreamUrl = (currentSong != null) ? currentSong.streamUrl : null;
@@ -207,6 +213,7 @@ public class CastyPlayer {
 
 			if (song.streamUrl != null) {
 				player = playerFactory.newHeadlessMediaPlayer();
+				player.setVolume(volume);
 				player.addMediaPlayerEventListener(new MediaPlayerEventAdapter() {
 					@Override
 					public void finished(MediaPlayer mediaPlayer) {
@@ -276,7 +283,12 @@ public class CastyPlayer {
 	}
 
 	public synchronized void reset() {
-		if (player != null) player.release();
+		if (player != null) {
+			player.stop();
+			player.setVolume(DEFAULT_VOLUME);
+			volume = DEFAULT_VOLUME;
+			player.release();
+		}
 		player = null;
 		if (currentSong != null && currentSong.file != null) currentSong.file.getLocks().readRelease();
 		currentSong = null;
@@ -300,10 +312,12 @@ public class CastyPlayer {
 				status.state = PlayerState.STOPPED;
 			}
 			status.songCount = songCount;
+			status.volume = player.getVolume();
 		}
 		else {
 			status.state = PlayerState.STOPPED;
 			status.songCount = 0;
+			status.volume = -1;
 		}
 		status.playlist = playlist.getStatus();
 		return status;
@@ -321,6 +335,13 @@ public class CastyPlayer {
 	public synchronized boolean setPosition(float percent) {
 		if (player == null) return false;
 		player.setPosition(percent);
+		return true;
+	}
+
+	public synchronized boolean setVolume(int volume) {
+		if (player == null) return false;
+		player.setVolume(volume);
+		this.volume = volume;
 		return true;
 	}
 

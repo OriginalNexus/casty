@@ -163,12 +163,12 @@ function playPauseClick() {
 }
 
 function nextClick() {
-	$.post("/player/control", { action: "next"});
+	$.post("/player/control", { action: "next" });
 
 }
 
 function previousClick() {
-	$.post("/player/control", { action: "previous"}, function(data) {
+	$.post("/player/control", { action: "previous" }, function(data) {
 		songPercent = 0;
 	});
 }
@@ -223,6 +223,27 @@ function downloadClick() {
 	if (url != "") document.location.href = url;
 }
 
+function volumeClick() {
+	var volWrap = $("#volume-wrapper");
+	if (!volWrap.hasClass("volume-opened")) {
+		volWrap.fadeIn();
+		volWrap.addClass("volume-opened")
+		return;
+	}
+	var volSlider = $("#volume-slider");
+	if (volSlider.val() == 0) volSlider[0].MaterialSlider.change(100);
+	else volSlider[0].MaterialSlider.change(0);
+	volumeChanged();
+}
+
+function volumeChanged(send = true) {
+	var volume = $("#volume-slider").val();
+	var icon = $("#volume-btn .material-icons");
+	if (volume == 0) icon.text("volume_mute");
+	else if (volume < 50) icon.text("volume_down");
+	else icon.text("volume_up");
+	if (send) $.post("/player/control", { action: "volume", level: volume });
+}
 
 function updateInfo() {
 	$.getJSON("/song/info", null, function(info) {
@@ -265,11 +286,12 @@ function updateStatus() {
 
 	$.getJSON("/player/status", null, function(status) {
 		var btn = $("#play-pause-btn");
-		var newSongCount = 0;
+		var newSongCount = 0, volume = -1;
 		if (status) {
 			playerState = status.hasOwnProperty("state") ? status.state : State.STOPPED;
 			songPercent = status.hasOwnProperty("percent") ? status.percent : -1;
 			newSongCount = status.hasOwnProperty("song") ? status.song : songCount;
+			volume = status.hasOwnProperty("volume") ? status.volume : -1;
 		}
 		else {
 			playerState = State.STOPPED;
@@ -315,6 +337,18 @@ function updateStatus() {
 		}
 
 		updatePlaylist(newPlaylistVersion);
+
+		if (volume >= 0) {
+			$("#volume-btn").prop("disabled", false);
+			var volSlider = $("#volume-slider");
+			if (!volSlider.hasClass("is-dragged")) volSlider[0].MaterialSlider.change(volume);
+			volumeChanged(false);
+		}
+		else {
+			$("#volume-btn").prop("disabled", true);
+			$("#volume-wrapper").removeClass("volume-opened");
+			$("#volume-wrapper").hide();
+		}
 
 	}).done(function() {
 		window.setTimeout(function() { updateStatus(); }, 1500);
@@ -400,6 +434,7 @@ $(document).ready(function() {
 	$(".download-btn").click(downloadClick);
 	$("#playlist-repeat-btn").click(playlistRepeatClick);
 	$("#playlist-cache-btn").click(playlistCacheClick);
+	$("#volume-btn").click(volumeClick);
 
 	// Input
 	$("#search-textfield").keyup(function(event) {
@@ -453,6 +488,24 @@ $(document).ready(function() {
         }
 	}
 	progressBar.on("mousedown touchstart touchmove touchend", progressBarEvent);
+
+	// Volume
+	$(document).mouseup(function (e) {
+		// Hide volume if user clicks elsewhere
+		var volWrap = $("#volume-wrapper");
+		var container = $("#volume-wrapper, #volume-btn");
+		if (!container.is(e.target) && container.has(e.target).length === 0) {
+			volWrap.removeClass("volume-opened");
+			volWrap.hide();
+		}
+    });
+
+    var volSlider = $("#volume-slider");
+	volSlider.on("change", function() { volumeChanged(); });
+	volSlider.on("mouseup mousedown touchstart touchend", function(event) {
+		if (event.type == "mousedown" || event.type == "touchstart") volSlider.addClass("is-dragged");
+        else if (volSlider.hasClass("is-dragged")) volSlider.removeClass("is-dragged");
+	});
 
 	// Hotkeys
 	var keyDown = {}; // Used to keep track of keys held down

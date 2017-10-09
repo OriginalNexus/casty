@@ -8,4 +8,5 @@ class Status {
 	@SerializedName("song")
 	long songCount;
 	Float percent;
+	int volume;
 }

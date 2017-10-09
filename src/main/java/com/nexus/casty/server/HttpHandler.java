@@ -76,7 +76,25 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
 								responseMsg = "Invalid or missing index";
 								valid = false;
 							}
-							else success = CastyPlayer.getInstance().playlistPlayItem(index);
+							else {
+								success = CastyPlayer.getInstance().playlistPlayItem(index);
+							}
+							break;
+						case "volume":
+							int volume = -1;
+							String level = query.get("level");
+							if (level != null) {
+								try {
+									volume = Integer.valueOf(level);
+								} catch (NumberFormatException ignored) {}
+							}
+							if (volume < 0) {
+								responseMsg = "Invalid or missing volume level";
+								valid = false;
+							}
+							else {
+								success = CastyPlayer.getInstance().setVolume(volume);
+							}
 							break;
 						default:
 							responseMsg = "Invalid action";
