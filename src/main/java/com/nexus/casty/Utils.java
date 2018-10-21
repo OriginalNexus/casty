@@ -6,6 +6,7 @@ import org.jetbrains.annotations.Nullable;
 import java.io.*;
 import java.math.BigInteger;
 import java.net.URL;
+import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
@@ -33,7 +34,7 @@ public class Utils {
 	public static String streamToString(@NotNull InputStream input) throws IOException {
 		ByteArrayOutputStream output = new ByteArrayOutputStream();
 		streamCopy(input, output);
-		return output.toString("UTF-8");
+		return output.toString(StandardCharsets.UTF_8);
 	}
 
 	public static void fileToStream(@NotNull File file, @NotNull OutputStream output) throws IOException {
@@ -42,9 +43,11 @@ public class Utils {
 		}
 	}
 
-	public static void urlToFile(@NotNull String url, @NotNull File file) throws IOException {
+	public static void downloadFile(@NotNull String url, @NotNull File file) throws IOException {
 		try (FileOutputStream fs = new FileOutputStream(file)) {
-			streamCopy(new URL(url).openStream(), fs);
+			URLConnection con = new URL(url).openConnection();
+			con.setRequestProperty("range", "bytes=0-");
+			streamCopy(con.getInputStream(), fs);
 		}
 	}
 

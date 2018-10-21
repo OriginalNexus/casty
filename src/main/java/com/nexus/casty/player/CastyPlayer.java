@@ -10,11 +10,10 @@ import com.nexus.casty.cache.CacheManager;
 import com.nexus.casty.song.*;
 import com.originalnexus.ytd.*;
 import org.jetbrains.annotations.NotNull;
-import uk.co.caprica.vlcj.binding.LibVlcFactory;
 import uk.co.caprica.vlcj.binding.internal.libvlc_state_t;
+import uk.co.caprica.vlcj.component.AudioMediaPlayerComponent;
 import uk.co.caprica.vlcj.player.MediaPlayer;
 import uk.co.caprica.vlcj.player.MediaPlayerEventAdapter;
-import uk.co.caprica.vlcj.player.MediaPlayerFactory;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -40,8 +39,7 @@ public class CastyPlayer {
 
 	private final CacheManager cache;
 
-	private final MediaPlayerFactory playerFactory;
-	private MediaPlayer player = null;
+	private MediaPlayer player;
 
 	private Song currentSong;
 	private long songCount = 0;
@@ -59,8 +57,17 @@ public class CastyPlayer {
 			throw new RuntimeException("Could not instantiate player cache", e);
 		}
 
-		// Create a player factory from a synchronized LibVlc instance
-		playerFactory = new MediaPlayerFactory(LibVlcFactory.factory().synchronise().create());
+		// Create and setup audio player
+//		MediaPlayerFactory playerFactory = new MediaPlayerFactory(LibVlcFactory.factory().synchronise().create());
+		AudioMediaPlayerComponent playerComponent = new AudioMediaPlayerComponent();
+		player = playerComponent.getMediaPlayer();
+		player.setVolume(volume);
+		player.addMediaPlayerEventListener(new MediaPlayerEventAdapter() {
+			@Override
+			public void finished(MediaPlayer mediaPlayer) {
+				next();
+			}
+		});
 	}
 
 	public static CastyPlayer getInstance() {
@@ -87,10 +94,14 @@ public class CastyPlayer {
 		YTUrl ytUrl = YTUrl.fromUrl(url);
 		if (ytUrl == null) return null;
 
-		YTExtractor ytExtractor = new YTExtractor(ytUrl);
+		return getYouTubeSong(new YTExtractor(ytUrl));
+	}
+
+	private Song getYouTubeSong(YTExtractor ytExtractor) {
 		YTFormat ytFormat = null;
 
-		String id = ytUrl.getId();
+		String id = ytExtractor.getYTUrl().getId();
+		String url = ytExtractor.getYTUrl().getUrl();
 		Song song;
 		boolean isNew = false;
 
@@ -124,7 +135,7 @@ public class CastyPlayer {
 						}
 
 						// Download file
-						Utils.urlToFile(ytFormat.getURL(), f);
+						Utils.downloadFile(ytFormat.getURL(), f);
 						isNew = true;
 
 						// Set song data
@@ -198,28 +209,17 @@ public class CastyPlayer {
 		return song;
 	}
 
+	@SuppressWarnings("BooleanMethodIsAlwaysInverted")
 	private synchronized boolean playSong(@NotNull Song song) {
 		boolean success = false;
 		try {
-			if (player != null) {
-				player.stop();
-				player.setVolume(DEFAULT_VOLUME);
-				player.release();
-			}
-			player = null;
+			player.stop();
+
 			if (currentSong != null && currentSong.file != null) currentSong.file.getLocks().readRelease();
 			String lastStreamUrl = (currentSong != null) ? currentSong.streamUrl : null;
 			currentSong = null;
 
 			if (song.streamUrl != null) {
-				player = playerFactory.newHeadlessMediaPlayer();
-				player.setVolume(volume);
-				player.addMediaPlayerEventListener(new MediaPlayerEventAdapter() {
-					@Override
-					public void finished(MediaPlayer mediaPlayer) {
-						next();
-					}
-				});
 				boolean demux = (song.data != null) && song.data.specialDemux;
 				success = player.startMedia(song.streamUrl, demux ? "demux=avformat" : "", "http-reconnect");
 
@@ -260,13 +260,20 @@ public class CastyPlayer {
 		else {
 			if (currentSong == null || currentSong.ytExtractor == null) return false;
 			try {
-				url = currentSong.ytExtractor.getNextVideoUrl();
+				YTExtractor nextYTExtractor = currentSong.ytExtractor.getNextVideo();
+				new Thread(() -> {
+					Song song = getYouTubeSong(nextYTExtractor);
+					if (song == null) return;
+					playSong(song);
+				}).start();
+				return true;
 			} catch (IOException e) {
 				System.err.println("Could extract next url for current song");
 				e.printStackTrace();
 				return false;
 			}
 		}
+
 		new Thread(() -> playUrl(url)).start();
 		return true;
 	}
@@ -283,13 +290,10 @@ public class CastyPlayer {
 	}
 
 	public synchronized void reset() {
-		if (player != null) {
-			player.stop();
-			player.setVolume(DEFAULT_VOLUME);
-			volume = DEFAULT_VOLUME;
-			player.release();
-		}
-		player = null;
+		player.stop();
+		volume = DEFAULT_VOLUME;
+		player.setVolume(volume);
+
 		if (currentSong != null && currentSong.file != null) currentSong.file.getLocks().readRelease();
 		currentSong = null;
 		songCount = 0;
@@ -299,26 +303,19 @@ public class CastyPlayer {
 
 	public synchronized Status getStatus() {
 		Status status = new Status();
-		if (player != null) {
-			if (player.isPlaying()) {
-				status.state = PlayerState.PLAYING;
-				status.percent = player.getPosition();
-			}
-			else if (player.getMediaState() == libvlc_state_t.libvlc_Paused) {
-				status.state = PlayerState.PAUSED;
-				status.percent = player.getPosition();
-			}
-			else {
-				status.state = PlayerState.STOPPED;
-			}
-			status.songCount = songCount;
-			status.volume = player.getVolume();
+		if (player.isPlaying()) {
+			status.state = PlayerState.PLAYING;
+			status.percent = player.getPosition();
+		}
+		else if (player.getMediaState() == libvlc_state_t.libvlc_Paused) {
+			status.state = PlayerState.PAUSED;
+			status.percent = player.getPosition();
 		}
 		else {
 			status.state = PlayerState.STOPPED;
-			status.songCount = 0;
-			status.volume = -1;
 		}
+		status.songCount = songCount;
+		status.volume = player.getVolume();
 		status.playlist = playlist.getStatus();
 		return status;
 	}
@@ -333,13 +330,11 @@ public class CastyPlayer {
 	}
 
 	public synchronized boolean setPosition(float percent) {
-		if (player == null) return false;
 		player.setPosition(percent);
 		return true;
 	}
 
 	public synchronized boolean setVolume(int volume) {
-		if (player == null) return false;
 		player.setVolume(volume);
 		this.volume = volume;
 		return true;

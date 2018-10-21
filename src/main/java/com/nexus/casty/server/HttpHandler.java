@@ -51,7 +51,7 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
 				else {
 					switch (query.get("action")) {
 						case "playurl":
-							success = CastyPlayer.getInstance().playUrl(URLDecoder.decode(query.get("url"), "UTF-8"));
+							success = CastyPlayer.getInstance().playUrl(URLDecoder.decode(query.get("url"), StandardCharsets.UTF_8));
 							break;
 						case "playpause":
 							success = CastyPlayer.getInstance().playPause();
@@ -114,8 +114,8 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
 					if (title == null) title = url;
 
 					PlaylistItem item = new PlaylistItem();
-					item.url = URLDecoder.decode(url, "UTF-8");
-					item.title = URLDecoder.decode(title, "UTF-8");
+					item.url = URLDecoder.decode(url, StandardCharsets.UTF_8);
+					item.title = URLDecoder.decode(title, StandardCharsets.UTF_8);
 					success = CastyPlayer.getInstance().getPlaylist().addItem(item);
 				}
 				break;
@@ -138,9 +138,17 @@ class HttpHandler implements com.sun.net.httpserver.HttpHandler {
 			case "/playlist/control":
 				String repeat = query.get("repeat");
 				if (repeat != null) {
-					if (repeat.toLowerCase().equals("true")) CastyPlayer.getInstance().getPlaylist().setRepeat(true);
-					else if (repeat.toLowerCase().equals("false")) CastyPlayer.getInstance().getPlaylist().setRepeat(false);
-					else success = false;
+					switch (repeat.toLowerCase()) {
+						case "true":
+							CastyPlayer.getInstance().getPlaylist().setRepeat(true);
+							break;
+						case "false":
+							CastyPlayer.getInstance().getPlaylist().setRepeat(false);
+							break;
+						default:
+							success = false;
+							break;
+					}
 				}
 				break;
 			case "/playlist/cache":

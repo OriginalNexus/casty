@@ -141,7 +141,7 @@ public class CastyMain extends JFrame {
 					setUIState(UIState.STOPPING);
 					(new SwingWorker<Void, Void>() {
 						@Override
-						protected Void doInBackground() throws Exception {
+						protected Void doInBackground() {
 							CastyServer.getInstance().stopServer();
 							return null;
 						}
@@ -303,6 +303,9 @@ public class CastyMain extends JFrame {
 			return;
 		}
 		System.out.println("VLC version: " + LibVlc.INSTANCE.libvlc_get_version());
+
+		// Disable JDK 11 deprecation warnings
+		System.setProperty("nashorn.args", "--no-deprecation-warning");
 
 		SwingUtilities.invokeLater(() -> {
 			JFrame frame = new CastyMain();

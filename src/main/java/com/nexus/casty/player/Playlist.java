@@ -47,7 +47,7 @@ public class Playlist {
 	}
 
 	public synchronized PlaylistItem[] toArray() {
-		return playlist.toArray(new PlaylistItem[playlist.size()]);
+		return playlist.toArray(new PlaylistItem[0]);
 	}
 
 	public synchronized void setRepeat(boolean repeat) {
@@ -85,7 +85,7 @@ public class Playlist {
 		if (playlist.size() == 0) return -1;
 		if (nextIndex >= 0) {
 			if (nextIndex >= playlist.size() && status.repeat) return 0;
-			else if (nextIndex >= playlist.size() && !status.repeat) return -1;
+			else if (nextIndex >= playlist.size()) return -1;
 			else return nextIndex;
 		}
 		return status.index >= 0 ? (status.index + 1 >= playlist.size() ? (status.repeat ? 0 : -1) : (status.index + 1)) : -1;
@@ -98,7 +98,7 @@ public class Playlist {
 		if (status.index == 0) return -1;
 		if (status.index < 0) {
 			if (nextIndex >= playlist.size()) return playlist.size() - 1;
-			if (nextIndex > 0 && nextIndex < playlist.size()) return nextIndex - 1;
+			if (nextIndex > 0) return nextIndex - 1;
 			if (nextIndex == 0 && status.repeat) return playlist.size() - 1;
 		}
 		return -1;
