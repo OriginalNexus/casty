@@ -1,41 +1,78 @@
 package com.nexus.casty.server;
 
-import com.nexus.casty.player.CastyPlayer;
-import com.sun.net.httpserver.HttpServer;
+import org.eclipse.jetty.server.*;
+import org.eclipse.jetty.server.handler.*;
+import org.eclipse.jetty.servlet.ErrorPageErrorHandler;
+import org.eclipse.jetty.websocket.server.WebSocketHandler;
+import org.eclipse.jetty.websocket.servlet.WebSocketServletFactory;
 
-import java.io.*;
+import javax.servlet.http.HttpServletResponse;
+import java.io.File;
 import java.net.*;
-import java.util.concurrent.Executors;
 
 public class CastyServer {
 
 	public static final int DEFAULT_PORT = 5555;
 
 	private static final CastyServer ourInstance = new CastyServer();
-	private HttpServer server = null;
+	private Server server;
+	private ServerConnector serverConnector;
 	private boolean running = false;
 
 	public static CastyServer getInstance() {
 		return ourInstance;
 	}
 
-	private CastyServer() {}
+	private CastyServer() {
+		server = new Server();
+		serverConnector = new ServerConnector(server);
+		server.setConnectors(new Connector[] {serverConnector});
 
-	public synchronized void startServer(String hostname, int port) throws IOException, IllegalStateException {
-		if (server != null) throw new IllegalStateException("CastyServer already started");
-		server = HttpServer.create(new InetSocketAddress(hostname, port), 0);
-		server.createContext("/", new HttpHandler());
-		server.setExecutor(Executors.newCachedThreadPool());
+		// Static resources handler
+		String localDevPath = "src/main/resources/html";
+		boolean isDev = new File(localDevPath).exists();
+		String resourcesPath = isDev ? localDevPath : getClass().getResource("/html").toExternalForm();
+
+		ResourceHandler resourceHandler = new ResourceHandler();
+		resourceHandler.setResourceBase(resourcesPath);
+		resourceHandler.setDirectoriesListed(false);
+
+		// Error handler
+		ErrorPageErrorHandler errorPageErrorHandler = new ErrorPageErrorHandler();
+		errorPageErrorHandler.addErrorPage(HttpServletResponse.SC_NOT_FOUND, "/404.html");
+		errorPageErrorHandler.addErrorPage(HttpServletResponse.SC_FORBIDDEN, "/403.html");
+
+		// HTTP context handler (custom + static resources + error handlers)
+		ContextHandler httpContextHandler = new ContextHandler("/");
+		httpContextHandler.setHandler(new HandlerCollection(new CastyHttpHandler(), resourceHandler, new DefaultHandler()));
+		httpContextHandler.setErrorHandler(errorPageErrorHandler);
+
+		// WebSockets handler
+		ContextHandler wsContextHandler = new ContextHandler("/ws");
+		wsContextHandler.setHandler(new WebSocketHandler() {
+			@Override
+			public void configure(WebSocketServletFactory factory) {
+				factory.register(CastyWebSocketHandler.class);
+			}
+		});
+
+		server.setHandler(new ContextHandlerCollection(wsContextHandler, httpContextHandler));
+	}
+
+	public synchronized void startServer(String hostname, int port) throws Exception {
+		if (running)
+			throw new IllegalStateException("CastyServer already started!");
+
+		serverConnector.setPort(port);
+		serverConnector.setHost(hostname);
 		server.start();
+
 		running = true;
 	}
 
-	public synchronized void stopServer() {
-		if (server != null && isRunning()) {
-			server.stop(5);
-			CastyPlayer.getInstance().reset();
-		}
-		server = null;
+	public synchronized void stopServer() throws Exception {
+		if (running)
+			server.stop();
 		running = false;
 	}
 
@@ -44,10 +81,7 @@ public class CastyServer {
 	}
 
 	public synchronized String getAddress() {
-		if (server != null) {
-			return "http://" + server.getAddress().getHostString() + ":" + server.getAddress().getPort();
-		}
-		return null;
+		return "http://" + serverConnector.getHost() + ":" + serverConnector.getPort();
 	}
 
 	public static String getHostAddress() {

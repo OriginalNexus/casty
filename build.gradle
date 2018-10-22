@@ -2,7 +2,7 @@ apply plugin: 'java'
 apply plugin: 'application'
 apply plugin: 'idea'
 
-sourceCompatibility = 1.8
+sourceCompatibility = 11
 group = 'com.nexus'
 version = '1.2.2'
 description = 'A user-friendly audio casting web server'
@@ -30,7 +30,8 @@ dependencies {
     compile 'org.slf4j:slf4j-nop:1.7.25'
     compile 'com.jgoodies:jgoodies-forms:1.9.0'
     compile 'uk.co.caprica:vlcj:3.10.1'
-    compile 'org.eclipse.jetty:jetty-server:9.4.8.v20171121'
+    compile 'org.eclipse.jetty.websocket:websocket-server:9.4.12.v20180830'
+
     compile 'com.originalnexus:ytd:1.0.6'
 
 }

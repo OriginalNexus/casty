@@ -421,6 +421,9 @@ function updatePlaylist(newVersion) {
 
 // Main function
 $(document).ready(function() {
+    // Wait for MDL to fully load
+    componentHandler.upgradeAllRegistered();
+
 	// Window focus
 	$(window).focus(function() { windowFocused = true; });
 	$(window).blur(function() { windowFocused = false; });
@@ -544,5 +547,26 @@ $(document).ready(function() {
 	// Update
 	updateStatus();
 	updateProgressBar(Date.now());
+
+	// WebSocket
+	var ws = new WebSocket("ws://" + location.host + "/ws/");
+
+    ws.onopen = function() {
+        console.log("Opened!");
+        ws.send("Hello Server");
+    };
+
+    ws.onmessage = function (evt) {
+        console.log("Message: " + evt.data);
+    };
+
+    ws.onclose = function() {
+        console.log("Closed!");
+    };
+
+    ws.onerror = function(err) {
+        console.log("Error!");
+        console.log(err);
+    };
 
 });

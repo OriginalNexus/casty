@@ -141,13 +141,23 @@ public class CastyMain extends JFrame {
 					setUIState(UIState.STOPPING);
 					(new SwingWorker<Void, Void>() {
 						@Override
-						protected Void doInBackground() {
+						protected Void doInBackground() throws Exception {
 							CastyServer.getInstance().stopServer();
+							CastyPlayer.getInstance().reset();
 							return null;
 						}
 
 						@Override
 						protected void done() {
+							try {
+								get();
+							} catch (Exception e1) {
+								System.err.println("Could not stop server");
+								e1.printStackTrace();
+								JOptionPane.showMessageDialog(null, "Could not stop server\nReason: " + e1.getMessage(), "Casty", JOptionPane.ERROR_MESSAGE);
+								setUIState(UIState.RUNNING);
+								return;
+							}
 							setUIState(UIState.STOPPED);
 						}
 					}).execute();
