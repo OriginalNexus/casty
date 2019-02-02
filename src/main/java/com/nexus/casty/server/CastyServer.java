@@ -25,7 +25,11 @@ public class CastyServer {
 
 	private CastyServer() {
 		server = new Server();
-		serverConnector = new ServerConnector(server);
+		serverConnector = new ServerConnector(server, new HttpConnectionFactory(new HttpConfiguration() {
+			{
+				this.setSendServerVersion(false);
+			}
+		}));
 		server.setConnectors(new Connector[] {serverConnector});
 
 		// Static resources handler
@@ -52,6 +56,7 @@ public class CastyServer {
 		wsContextHandler.setHandler(new WebSocketHandler() {
 			@Override
 			public void configure(WebSocketServletFactory factory) {
+				factory.getPolicy().setIdleTimeout(0); // No timeout
 				factory.register(CastyWebSocketHandler.class);
 			}
 		});

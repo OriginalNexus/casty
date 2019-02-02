@@ -1,48 +1,69 @@
 // Global variables
-var windowFocused = true;
-var songCount = 0;
+var ws;
 var songLength = -1;
 var songPercent = -1;
-var lasSongPercent = -1;
 var progressBarValue = 0;
+var progressBar;
+var lastUpdateTime;
 var State = {
 	"STOPPED": 0,
 	"PLAYING": 1,
 	"PAUSED": 2
 }
 var playerState = State.STOPPED;
-var playlistVersion = 0;
 var playlistIndex = -1;
-var playlistRepeat = false;
 
+function createWebSocket() {
+    $("#offline-wrapper").hide();
 
-function searchResultClick(target, url) {
-	if ($("#results .mdl-spinner.is-active").length > 0) return;
-	var spinner = $(target).find(".mdl-spinner");
-	spinner.addClass("is-active");
+    // WebSocket
+    ws = new WebSocket("ws://" + location.host + "/ws/");
 
-	$.post("/player/control", { action: "playurl", url: url})
-	.always(function(data) {
-		spinner.removeClass("is-active");
-	});
+    ws.onopen = function() {
+        console.log("WebSocket opened!");
+    };
+
+    ws.onmessage = function (evt) {
+        updateStatus(JSON.parse(evt.data));
+    };
+
+    ws.onclose = function() {
+        console.log("WebSocket closed!");
+        updateStatus();
+    };
+
+    ws.onerror = function(err) {
+        console.log("WebSocket error!");
+        console.log(err);
+    };
 }
 
-function searchBtnClick() {
+function sendCommand(scope, action, params = {}) {
+    ws.send(JSON.stringify({
+        scope: scope,
+        action: action,
+        params: params
+    }));
+}
+
+function searchResultClick(target, url) {
+    sendCommand("player", "playurl", { url: url });
+}
+
+function search() {
 	var query = $("#search-textfield").val();
-	if (query === "") return;
+
+	if (query === "")
+	    return;
 
 	if (query.startsWith("http://") || query.startsWith("https://")) {
-		$.post("/player/control", { action: "playurl", url: query});
+	    sendCommand("player", "playurl", { url: query });
 		return;
 	}
 
 	var overlay = $("#content-overlay")
-	var spinner = overlay.find(".mdl-spinner");
 	var resultsWrapper = $("#results-wrapper");
 	var results = $("#results");
-
-	if (spinner.hasClass("is-active")) return;
-	spinner.addClass("is-active");
 
 	overlay.fadeIn();
 
@@ -53,54 +74,49 @@ function searchBtnClick() {
 			$.each(data, function(i, result) {
 				var resultDiv =
 				$("<li>", {
-					"class": "mdl-list__item  mdl-list__item--two-line",
+					"class": "list-group-item list-group-item-action d-flex align-items-center px-0",
 					click: function() {
 						searchResultClick(this, "https://www.youtube.com/watch?v=" + result["id"]);
 					}
 				}).append(
-					$("<span>", {
-						"class": "thumbnail",
+					$("<div>", {
+						"class": "thumbnail flex-shrink-0 ml-3",
 						css: {
 							"background-image": "url(\"" + result["thumbnail"] + "\")"
 						}
 					}),
-					$("<span>", {
-						"class": "mdl-list__item-primary-content"
+					$("<div>", {
+						"class": "d-flex flex-column flex-grow-1 ml-3",
+						css: {
+						    "min-width": "0"
+						}
 					}).append(
 						$("<span>", {
-							"class": "title ellipsis",
+							"class": "text-truncate",
 							text: result["title"]
 						}),
 						$("<span>", {
-							"class": "spinner"
-						}).append(
-							$("<div>", {
-								"class": "mdl-spinner mdl-js-spinner mdl-spinner--single-color"
-							})
-						),
-						$("<span>", {
-							text: result["author"] ? result["author"] : "Unknown artist",
-							"class" : "mdl-list__item-sub-title ellipsis"
+							"class" : "text-truncate",
+							text: result["author"] ? result["author"] : "Unknown artist"
 						})
 					),
-					$("<span>", {
-						"class": "mdl-list__item-secondary-content"
+					$("<div>", {
+						"class": "flex-shrink-0 mr-1"
 					}).append(
 						$("<button>", {
-							"class": "mdl-list__item-secondary-action mdl-button mdl-js-button mdl-button--icon mdl-js-ripple-effect",
+							"class": "btn btn-flat btn-icon",
 							click: function(event) {
 								event.stopPropagation();
 								playlistAdd(result["title"], "https://www.youtube.com/watch?v=" + result["id"]);
 							}
 						}).append(
-							$("<i>", {
-								text: "playlist_add",
-								"class": "material-icons"
-							})
+						    $("<i>", {
+						        "class": "material-icons",
+						        text: "playlist_add"
+						    })
 						)
 					)
 				);
-				componentHandler.upgradeElement(resultDiv.find(".mdl-spinner")[0]);
 				results.append(resultDiv);
 			});
 			resultsWrapper.fadeIn();
@@ -108,329 +124,310 @@ function searchBtnClick() {
 	})
 	.always(function() {
 		overlay.hide();
-		spinner.removeClass("is-active");
 	});
 }
 
 
 function playlistAdd(title, url) {
-	$.post("/playlist/add", { title: title, url: url });
-
+    sendCommand("playlist", "add", { title: title, url: url });
 }
 
 function playlistRemove(index) {
-	$.post("/playlist/remove", { index: index }, function() {
-		var playlist = $("#playlist");
-		playlist.children().eq(index).remove();
-		if (playlist.children().length === 0) playlistEmpty();
-	});
+    sendCommand("playlist", "remove", { index: index });
+
+    $("#playlist").children().eq(index).remove();
 }
 
 function playlistPlay(index) {
-	$.post("/player/control", { action: "playlist", index: index });
-
-}
-
-function playlistEmpty() {
-	// Note that this function only displays the "Empty" text and does not remove songs from server
-	$("#playlist").empty().append($("<span>", { "class": "empty" }));
+    sendCommand("player", "playlist", { index: index });
 }
 
 function playlistSelectCurrent() {
 	var playlist = $("#playlist");
+
 	playlist.children(".active").removeClass("active");
-    if (playlistIndex >= 0) playlist.children().eq(playlistIndex).addClass("active");
+    if (playlistIndex >= 0)
+        playlist.children().eq(playlistIndex).addClass("active");
 }
 
 function playlistRepeatClick() {
 	var btn = $("#playlist-repeat-btn");
-	btn.toggleClass("mdl-button--colored");
-	$.post("/playlist/control", { repeat: btn.hasClass("mdl-button--colored") });
+
+	sendCommand("playlist", "repeat", { value: btn.hasClass("colored") });
+	btn.toggleClass("colored");
 }
 
 function playlistCacheClick() {
-	$.post("/playlist/cache");
-
+    sendCommand("playlist", "cache");
 }
 
 
 function playPauseClick() {
-	$.post("/player/control", { action: "playpause" }, function(data) {
-		if (playerState == State.PLAYING) playerState = State.PAUSED;
-		else playerState = State.PLAYING;
-		$("#play-pause-btn").toggleClass("pause");
-	});
+    sendCommand("player", "playpause");
+
+    if (playerState == State.PLAYING)
+        playerState = State.PAUSED;
+    else
+        playerState = State.PLAYING;
+
+    $("#play-pause-btn").toggleClass("pause");
 }
 
 function nextClick() {
-	$.post("/player/control", { action: "next" });
-
+    sendCommand("player", "next");
 }
 
 function previousClick() {
-	$.post("/player/control", { action: "previous" }, function(data) {
-		songPercent = 0;
-	});
+    sendCommand("player", "previous");
 }
 
-function updateProgressBar(lastTime) {
-	var time = Date.now();
-	var progressBar = $("#progress-bar");
+function setProgressBar(percent) {
+    progressBar.children().css('width', percent * 100 + '%');
+}
 
-	if (!windowFocused);
-	else if (songPercent < 0) {
+function updateProgressBar() {
+	if (songPercent < 0) {
 		progressBar.fadeOut();
-		songPercent = -1;
-		lasSongPercent = -1;
 	}
 	else {
-		if (lastTime && playerState == State.PLAYING && songLength > 0) {
-			songPercent += (time - lastTime) * 1.0 / songLength;
-		}
-		if (songPercent > 1) songPercent = 1;
+		if (playerState == State.PLAYING && songLength > 0)
+			songPercent += (Date.now() - lastUpdateTime) / songLength;
 
-		if (lasSongPercent != songPercent) {
-			lasSongPercent = songPercent;
+		if (songPercent > 1)
+		    songPercent = 1;
 
-			progressBar.fadeIn();
-			if (!progressBar.hasClass("is-dragged")) {
-				progressBar[0].MaterialProgress.setProgress(songPercent * 100);
-			}
-			if (songLength > 0) {
-				var totalMin = Math.floor(songLength / 60000);
-				var totalSec = Math.floor(songLength / 1000) % 60;
-				var currentMin = Math.floor(songLength * songPercent / 60000);
-				var currentSec = Math.floor(songLength * songPercent / 1000) % 60;
-				var totalText =  totalMin + ":" + (totalSec < 10 ? "0" : "") + totalSec;
-				var currentText = currentMin + ":" + (currentSec < 10 ? "0" : "") + currentSec;
-				var timeText = currentText + " / " + totalText;
-				$("#player .time").text(timeText);
-			}
-			else $("#player .time").text("");
-		}
+        progressBar.fadeIn();
+
+        if (!progressBar.hasClass("is-dragged"))
+            setProgressBar(songPercent);
+
+        if (songLength > 0) {
+            var totalMin = Math.floor(songLength / 60000);
+            var totalSec = Math.floor(songLength / 1000) % 60;
+            var currentMin = Math.floor(songLength * songPercent / 60000);
+            var currentSec = Math.floor(songLength * songPercent / 1000) % 60;
+            var totalText =  totalMin + ":" + (totalSec < 10 ? "0" : "") + totalSec;
+            var currentText = currentMin + ":" + (currentSec < 10 ? "0" : "") + currentSec;
+            var timeText = currentText + " / " + totalText;
+            $("#player .time").text(timeText);
+        }
+        else {
+            $("#player .time").text("");
+        }
 	}
-
-	if (lastTime) window.setTimeout(function() { updateProgressBar(time); }, 250);
+	lastUpdateTime = Date.now();
+	requestAnimationFrame(updateProgressBar);
 }
 
 function sendPosition() {
-	$.post("/player/control", { action: "position", percent: songPercent });
-	updateProgressBar();
+    sendCommand("player", "position", { percent: songPercent });
 }
 
 function downloadClick() {
 	var url = $(this).data("target");
-	if (url != "") document.location.href = url;
+
+	if (url != "")
+	    document.location.href = url;
+}
+
+function saveClick() {
+    var btn = $(".save-btn");
+    var dlBtn = $(".download-btn");
+
+    if (btn.hasClass("colored")) {
+        if (!$(".download-btn").data("target")) {
+            return;
+        }
+        sendCommand("player", "uncache");
+        dlBtn.attr("style", "display: none!important;");
+        dlBtn.data("target", "");
+    }
+    else {
+        sendCommand("player", "cache");
+    }
+
+    btn.toggleClass("colored");
 }
 
 function volumeClick() {
 	var volWrap = $("#volume-wrapper");
+
 	if (!volWrap.hasClass("volume-opened")) {
 		volWrap.fadeIn();
 		volWrap.addClass("volume-opened")
 		return;
 	}
+
 	var volSlider = $("#volume-slider");
-	if (volSlider.val() == 0) volSlider[0].MaterialSlider.change(100);
-	else volSlider[0].MaterialSlider.change(0);
+
+	if (volSlider.val() == 0)
+	    volSlider.val(100);
+	else
+	    volSlider.val(0);
+
 	volumeChanged();
 }
 
 function volumeChanged(send = true) {
 	var volume = $("#volume-slider").val();
-	var icon = $("#volume-btn .material-icons");
-	if (volume == 0) icon.text("volume_mute");
-	else if (volume < 50) icon.text("volume_down");
-	else icon.text("volume_up");
-	if (send) $.post("/player/control", { action: "volume", level: volume });
+	var icon = $("#volume-btn i");
+
+	if (volume == 0)
+	    icon.text("volume_mute");
+	else if (volume < 50)
+	    icon.text("volume_down");
+	else
+	    icon.text("volume_up");
+
+	if (send)
+	    sendCommand("player", "volume", { level: volume });
 }
 
-function updateInfo() {
-	$.getJSON("/song/info", null, function(info) {
-		var title = "", source = "", sourceName = "", thumbnail = "img/generic-song.png", thumbnailFull = "", download = "";
-		if (info) {
-			title = info.hasOwnProperty("title") ? info.title : "Unknown title";
-			source = info.hasOwnProperty("source") ? info.source : "#";
-			sourceName = info.hasOwnProperty("sourceName") ? info.sourceName : "Unknown source";
-			thumbnail = info.hasOwnProperty("thumbnail") ? info.thumbnail : "img/generic-song.png";
-			thumbnailFull = info.hasOwnProperty("thumbnailFull") ? info.thumbnailFull : "";
-			download = info.hasOwnProperty("download") ? info.download : "";
-		}
+function updateStatus(statusMsg) {
+    if (ws == null) {
+        createWebSocket()
+        return;
+    }
 
-		$("#player .title").text(title);
-		$("#player .source").text(sourceName).attr("href", source);
+    if (ws.readyState == 1) {
+        if (statusMsg.scope == "player") {
+            var status = statusMsg.data;
 
-		var thumb = $("#player .thumbnail").css("background-image", "url('" + thumbnail + "')");
-		if (thumbnailFull != "") thumb.attr("href", thumbnailFull);
-		else thumb.removeAttr("href");
+            if (status.hasOwnProperty('state')) {
+                playerState = status.state;
 
-		var downloadBtn = $(".download-btn");
-		if (download === "") {
-			downloadBtn.prop("disabled", true);
-			downloadBtn.data("target", "");
-		}
-		else {
-			downloadBtn.data("target", download);
-			downloadBtn.prop("disabled", false);
-		}
-	});
+                var btn = $("#play-pause-btn");
+                if (playerState == State.PLAYING) {
+                    if (!btn.hasClass("pause"))
+                        btn.addClass("pause");
+                }
+                else {
+                    btn.removeClass("pause");
+                }
+
+                if (playerState == State.STOPPED) {
+                    $("#player-controls button").prop("disabled", true);
+                    $(".save-btn").prop("disabled", true);
+                }
+                else {
+                    $("#player-controls button").prop("disabled", false);
+                    $(".save-btn").prop("disabled", false);
+                }
+            }
+
+            if (status.hasOwnProperty('percent')) {
+                songPercent = status.percent;
+                lastUpdateTime = Date.now();
+            }
+
+            if (status.hasOwnProperty('songLength'))
+                songLength = status.songLength;
+
+            if (status.hasOwnProperty('volume')) {
+                var volSlider = $("#volume-slider");
+
+                if (!volSlider.hasClass("is-dragged")) {
+                    volSlider.val(status.volume);
+                    volumeChanged(false);
+                }
+            }
+        }
+        else if (statusMsg.scope == "playlist") {
+            var status = statusMsg.data;
+
+            if (status.hasOwnProperty("items"))
+                updatePlaylistItems(status.items);
+
+            if (status.hasOwnProperty("index")) {
+                playlistIndex = status.index;
+                playlistSelectCurrent();
+            }
+
+            if (status.hasOwnProperty("repeat")) {
+                var repeatBtn = $("#playlist-repeat-btn");
+
+                if (status.repeat != repeatBtn.hasClass("colored"))
+                    repeatBtn.toggleClass("colored");
+            }
+        }
+        else if (statusMsg.scope == "song") {
+            var info = statusMsg.data;
+
+            $("#player .title").text(info.title);
+            $("#player .source").text(info.sourceName).attr("href", info.source);
+
+            var thumb = $("#player .thumbnail").css("background-image", "url('" + info.thumbnail + "')");
+
+            if (info.thumbnailFull)
+                thumb.attr("href", info.thumbnailFull);
+            else
+                thumb.removeAttr("href");
+
+            var downloadBtn = $(".download-btn");
+            var saveBtn = $(".save-btn");
+
+            if (info.download) {
+                downloadBtn.show();
+                downloadBtn.data("target", info.download);
+                saveBtn.addClass("colored");
+            } else {
+                downloadBtn.data("target", "");
+                downloadBtn.attr("style", "display: none!important;");
+                saveBtn.removeClass("colored");
+            }
+
+        }
+    }
+    else {
+        $("#player-controls button").prop("disabled", true);
+        $(".download-btn").attr("style", "display: none!important;");
+        $(".save-btn").prop("disabled", true);
+        songPercent = -1;
+        $("#offline-wrapper").show();
+        ws = null;
+    }
 }
 
-function updateStatus() {
-	if (!windowFocused) {
-		$(window).one("focus", function(event) { updateStatus(); })
-		return;
-	}
-
-	$("#offline-wrapper").hide();
-
-	$.getJSON("/player/status", null, function(status) {
-		var btn = $("#play-pause-btn");
-		var newSongCount = 0, volume = -1;
-		if (status) {
-			playerState = status.hasOwnProperty("state") ? status.state : State.STOPPED;
-			songPercent = status.hasOwnProperty("percent") ? status.percent : -1;
-			newSongCount = status.hasOwnProperty("song") ? status.song : songCount;
-			volume = status.hasOwnProperty("volume") ? status.volume : -1;
-		}
-		else {
-			playerState = State.STOPPED;
-			songPercent = -1;
-			playlistIndex = -1;
-		}
-
-		var newPlaylistVersion = 0;
-		if (status && status.hasOwnProperty("playlist")) {
-			newPlaylistVersion = status.playlist.hasOwnProperty("version") ? status.playlist.version : 0;
-			playlistIndex = status.playlist.hasOwnProperty("index") ? status.playlist.index : -1;
-			playlistRepeat = status.playlist.hasOwnProperty("repeat") ? status.playlist.repeat : false;
-		}
-		else {
-			playlistIndex = -1;
-			playlistRepeat = false;
-		}
-
-
-		if (playerState == State.PLAYING) {
-			if (!btn.hasClass("pause")) btn.addClass("pause");
-		}
-		else {
-			btn.removeClass("pause");
-		}
-		if (playerState == State.STOPPED) $("#player-controls button").prop("disabled", true);
-		else $("#player-controls button").prop("disabled", false);
-
-		if (songCount != newSongCount) {
-			updateInfo();
-			songLength = -1;
-			songCount = newSongCount;
-		}
-
-		if (playerState != State.STOPPED && songLength == -1) {
-			songLength = -2;
-			$.get("/song/length", null, function(length) {
-				if (length > 0) songLength = length;
-				else songLength = -1;
-			}).fail(function() {
-				songLength = -1;
-			});
-		}
-
-		updatePlaylist(newPlaylistVersion);
-
-		if (volume >= 0) {
-			$("#volume-btn").prop("disabled", false);
-			var volSlider = $("#volume-slider");
-			if (!volSlider.hasClass("is-dragged")) volSlider[0].MaterialSlider.change(volume);
-			volumeChanged(false);
-		}
-		else {
-			$("#volume-btn").prop("disabled", true);
-			$("#volume-wrapper").removeClass("volume-opened");
-			$("#volume-wrapper").hide();
-		}
-
-	}).done(function() {
-		window.setTimeout(function() { updateStatus(); }, 1500);
-	}).fail(function() {
-		$("#player-controls button").prop("disabled", true);
-		songPercent = -1;
-		$("#offline-wrapper").show();
-	});
-}
-
-function updatePlaylist(newVersion) {
+function updatePlaylistItems(items) {
 	var playlist = $("#playlist");
+    playlist.empty();
+    $.each(items, function(i, item) {
+        playlist.append(
+            $("<li>", {
+                "class": "list-group-item list-group-item-action d-flex  align-items-center py-0 pr-1",
+                click: function(event) {
+                    playlistPlay(i);
+                }
+            }).append(
+                $("<span>", {
+                    "class": "flex-grow-1 ellipsis",
+                    text: item["title"]
+                }),
+                $("<button>", {
+                    "class": "btn btn-flat btn-icon flex-noshrink",
+                    click: function(event) {
+                        event.stopPropagation();
+                        playlistRemove(i);
+                    },
 
-	if (playlistVersion != newVersion) {
-		$.getJSON("/playlist/list", null, function(list) {
-			playlist.empty();
-			$.each(list, function(i, item) {
-				playlist.append(
-					$("<li>", {
-						"class": "mdl-list__item",
-						click: function(event) {
-							playlistPlay(i);
-						}
-					}).append(
-						$("<span>", {
-							"class": "mdl-list__item-primary-content"
-						}).append(
-							$("<span>",{
-								"class": "ellipsis",
-								text: item["title"]
-							})
-						),
-						$("<span>", {
-							"class": "mdl-list__item-secondary-content"
-						}).append(
-							$("<button>", {
-								"class": "mdl-list__item-secondary-action mdl-button mdl-js-button mdl-button--icon mdl-js-ripple-effect flex-noshrink",
-								click: function(event) {
-									event.stopPropagation();
-									playlistRemove(i);
-								}
-							}).append(
-								$("<i>", {
-									text: "clear",
-									"class": "material-icons"
-								})
-							)
-						)
-					)
-				);
-			});
+                }).append(
+                    $("<i>", {
+                        "class": "material-icons",
+                        text: "clear"
+                    })
+                )
 
-			if (playlist.children().length === 0) playlistEmpty();
-			playlistSelectCurrent();
-
-		}).fail(function() {
-			playlistVersion = 0;
-		});
-		playlistVersion = newVersion;
-
-	}
-	else {
-		playlistSelectCurrent();
-	}
-
-	var repeatBtn = $("#playlist-repeat-btn");
-	if (playlistRepeat != repeatBtn.hasClass("mdl-button--colored")) repeatBtn.toggleClass("mdl-button--colored");
+            )
+        );
+    });
 }
 
 
 // Main function
 $(document).ready(function() {
-    // Wait for MDL to fully load
-    componentHandler.upgradeAllRegistered();
-
-	// Window focus
-	$(window).focus(function() { windowFocused = true; });
-	$(window).blur(function() { windowFocused = false; });
 
 	// Click events
-	$("#search-btn").click(searchBtnClick);
-	$("#connection-retry-btn").click(updateStatus);
+	$("#connection-retry-btn").click(createWebSocket);
 	$("#play-pause-btn").click(playPauseClick);
 	$("#next-btn").click(nextClick);
 	$("#previous-btn").click(previousClick);
@@ -438,10 +435,11 @@ $(document).ready(function() {
 	$("#playlist-repeat-btn").click(playlistRepeatClick);
 	$("#playlist-cache-btn").click(playlistCacheClick);
 	$("#volume-btn").click(volumeClick);
+	$(".save-btn").click(saveClick);
 
 	// Input
 	$("#search-textfield").keyup(function(event) {
-        if(event.keyCode == 13) $("#search-btn").click();
+        if(event.keyCode == 13) search();
     });
 
 	// Playlist
@@ -454,7 +452,8 @@ $(document).ready(function() {
 	});
 	$("#playlist-toggle-btn").click(function() {
 		playlistWrapper.toggleClass("playlist-opened");
-		if (playlistWrapper.hasClass("playlist-opened")) playlist.show();
+		if (playlistWrapper.hasClass("playlist-opened"))
+		    playlist.show();
 	});
 	$(document).mouseup(function (e) {
 		// Hide playlist if user clicks elsewhere
@@ -465,7 +464,7 @@ $(document).ready(function() {
 	});
 
 	// Progress bar
-	var progressBar = $("#progress-bar");
+	progressBar = $("#progress-bar");
 	function progressBarEvent(event) {
 		if (event.type == "mousedown" || event.type == "touchstart") {
 			progressBar.addClass("is-dragged");
@@ -474,12 +473,14 @@ $(document).ready(function() {
 		}
 		if (progressBar.hasClass("is-dragged")) {
        		var newPercent, x;
-       		if (event.type.substr(0, 5) == "touch") x = event.originalEvent.changedTouches[0].clientX;
-       		else x = event.pageX;
+       		if (event.type.substr(0, 5) == "touch")
+       		    x = event.originalEvent.changedTouches[0].clientX;
+       		else
+       		    x = event.pageX;
 
-       		newPercent = (x - progressBar.offset().left) / progressBar.width();
+       		newPercent = x / progressBar.width();
        		newPercent = newPercent >= 0 ? (newPercent <= 1 ? newPercent : 1) : 0;
-        	progressBar[0].MaterialProgress.setProgress(newPercent * 100);
+        	setProgressBar(newPercent);
 
         	if (event.type == "mouseup" || event.type == "touchend") {
         		songPercent = newPercent;
@@ -544,29 +545,10 @@ $(document).ready(function() {
 		delete keyDown[e.which];
 	});
 
-	// Update
-	updateStatus();
-	updateProgressBar(Date.now());
+    createWebSocket();
 
-	// WebSocket
-	var ws = new WebSocket("ws://" + location.host + "/ws/");
-
-    ws.onopen = function() {
-        console.log("Opened!");
-        ws.send("Hello Server");
-    };
-
-    ws.onmessage = function (evt) {
-        console.log("Message: " + evt.data);
-    };
-
-    ws.onclose = function() {
-        console.log("Closed!");
-    };
-
-    ws.onerror = function(err) {
-        console.log("Error!");
-        console.log(err);
-    };
+	// Update progress bar
+	lastUpdateTime = Date.now();
+	requestAnimationFrame(updateProgressBar);
 
 });

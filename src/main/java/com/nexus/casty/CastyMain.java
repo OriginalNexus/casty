@@ -1,8 +1,5 @@
 package com.nexus.casty;
 
-import com.jgoodies.forms.builder.FormBuilder;
-import com.jgoodies.forms.factories.Paddings;
-import com.nexus.casty.cache.CacheManager;
 import com.nexus.casty.player.CastyPlayer;
 import com.nexus.casty.server.CastyServer;
 import uk.co.caprica.vlcj.binding.LibVlc;
@@ -17,6 +14,8 @@ import java.net.URI;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 
+import static java.awt.GridBagConstraints.*;
+
 public class CastyMain extends JFrame {
 
 	private JLabel statusLabel;
@@ -25,7 +24,6 @@ public class CastyMain extends JFrame {
 	private JFormattedTextField portField;
 	private JCheckBox showInTrayCheckBox;
 	private JTextField hostnameField;
-	private JFormattedTextField cacheSizeField;
 
 	private TrayIcon trayIcon;
 
@@ -51,47 +49,54 @@ public class CastyMain extends JFrame {
 		portField.setText(String.valueOf(CastyServer.DEFAULT_PORT));
 		portField.setColumns(5);
 
-		cacheSizeField = new JFormattedTextField(format);
-		cacheSizeField.setText(String.valueOf((int) (CacheManager.DEFAULT_CACHE_SIZE / 1024 / 1024)));
-		cacheSizeField.setColumns(5);
-
 		showInTrayCheckBox = new JCheckBox();
 	}
 
 	private JPanel buildUI() {
 		createUIComponents();
 
-		JPanel serverPanel = FormBuilder.create()
-				.columns("r:d, 4dlu, f:d:g")
-				.rows("d, 4dlu, d, 4dlu, d")
-				.border(BorderFactory.createCompoundBorder(BorderFactory.createTitledBorder("Server"), Paddings.DLU7))
-				.add("Status").xy(1, 1)
-				.add(statusLabel).xy(3, 1)
-				.add("Address").xy(1, 3)
-				.add(addressLabel).xy(3, 3)
-				.add(toggleButton).xyw(1, 5, 3, "center, center").build();
+		setLayout(new GridBagLayout());
+		GridBagConstraints c;
 
-		JPanel settingsPanel = FormBuilder.create()
-				.columns("r:d, 4dlu, l:d")
-				.rows("d, 4dlu, d, 4dlu, d, 4dlu, d")
-				.border(BorderFactory.createCompoundBorder(BorderFactory.createTitledBorder("Settings"), Paddings.DLU7))
-				.add("Hostname").xy(1, 1)
-				.add(hostnameField).xy(3, 1)
-				.add("Port").xy(1, 3)
-				.add(portField).xy(3, 3)
-				.add("Cache size (MB)").xy(1, 5)
-				.add(cacheSizeField).xy(3, 5)
-				.add("Show in tray").xy(1, 7)
-				.add(showInTrayCheckBox).xy(3, 7)
-				.build();
+		JPanel serverPanel = new JPanel(new GridBagLayout());
+		serverPanel.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createTitledBorder("Server"), BorderFactory.createEmptyBorder(10, 10, 10, 10)));
 
-		return FormBuilder.create()
-				.columns("f:d:g")
-				.rows("f:d:g, 4dlu, f:d")
-				.border(Paddings.DIALOG)
-				.add(serverPanel).xy(1, 1)
-				.add(settingsPanel).xy(1, 3)
-				.build();
+		c = new GridBagConstraints(); c.gridx = 0; c.gridy = 0; c.anchor = LINE_END; c.insets.right = 6; c.insets.bottom = 6;
+		serverPanel.add(new JLabel("Status"), c);
+		c = new GridBagConstraints(); c.gridx = 1; c.gridy = 0; c.anchor = LINE_START; c.weightx = 1; c.insets.bottom = 6;
+		serverPanel.add(statusLabel, c);
+		c = new GridBagConstraints(); c.gridx = 0; c.gridy = 1; c.anchor = LINE_END; c.insets.right = 6; c.insets.bottom = 6;
+		serverPanel.add(new JLabel("Address"), c);
+		c = new GridBagConstraints(); c.gridx = 1; c.gridy = 1; c.anchor = LINE_START; c.weightx = 1; c.insets.bottom = 6;
+		serverPanel.add(addressLabel, c);
+		c = new GridBagConstraints(); c.gridx = 0; c.gridy = 2; c.gridwidth = 2; c.anchor = PAGE_START; c.weighty = 1;
+		serverPanel.add(toggleButton, c);
+
+		JPanel settingsPanel = new JPanel(new GridBagLayout());
+		settingsPanel.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createTitledBorder("Settings"), BorderFactory.createEmptyBorder(10, 10, 10, 10)));
+
+		c = new GridBagConstraints(); c.gridx = 0; c.gridy = 0; c.anchor = LINE_END; c.insets.right = 6; c.insets.bottom = 6;
+		settingsPanel.add(new JLabel("Hostname"), c);
+		c = new GridBagConstraints(); c.gridx = 1; c.gridy = 0; c.anchor = LINE_START; c.weightx = 1; c.insets.bottom = 6;
+		settingsPanel.add(hostnameField, c);
+		c = new GridBagConstraints(); c.gridx = 0; c.gridy = 1; c.anchor = LINE_END; c.insets.right = 6; c.insets.bottom = 6;
+		settingsPanel.add(new JLabel("Port"), c);
+		c = new GridBagConstraints(); c.gridx = 1; c.gridy = 1; c.anchor = LINE_START; c.weightx = 1; c.insets.bottom = 6;
+		settingsPanel.add(portField, c);
+		c = new GridBagConstraints(); c.gridx = 0; c.gridy = 2; c.anchor = LINE_END; c.insets.right = 6;
+		settingsPanel.add(new JLabel("Show in tray"), c);
+		c = new GridBagConstraints(); c.gridx = 1; c.gridy = 2; c.anchor = LINE_START; c.weightx = 1;
+		settingsPanel.add(showInTrayCheckBox, c);
+
+		JPanel mainPanel = new JPanel(new GridBagLayout());
+		mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10 ,10));
+
+		c = new GridBagConstraints(); c.gridx = 0; c.gridy = 0; c.weightx = 1; c.weighty = 1; c.fill = BOTH; c.insets.bottom = 6;
+		mainPanel.add(serverPanel, c);
+		c = new GridBagConstraints(); c.gridx = 0; c.gridy = 1; c.weightx = 1; c.fill = HORIZONTAL;
+		mainPanel.add(settingsPanel, c);
+
+		return mainPanel;
 	}
 
 	private void addEventListeners()  {
@@ -100,11 +105,10 @@ public class CastyMain extends JFrame {
 			public void mouseClicked(MouseEvent e) {
 				if (!CastyServer.getInstance().isRunning()) {
 					// Get settings
-					int port; String hostname; long cacheSize;
+					int port; String hostname;
 					try {
 						port = Integer.valueOf(portField.getText());
 						hostname = hostnameField.getText().isEmpty() ? CastyServer.getHostAddress() : hostnameField.getText();
-						cacheSize = Long.valueOf(cacheSizeField.getText()) * 1024 * 1024;
 					}
 					catch (NumberFormatException ex) {
 						JOptionPane.showMessageDialog(null, "Invalid settings\n" + ex.getMessage(), "Casty", JOptionPane.ERROR_MESSAGE);
@@ -116,7 +120,6 @@ public class CastyMain extends JFrame {
 					(new SwingWorker<Void, Void>() {
 						@Override
 						protected Void doInBackground() throws Exception {
-							CastyPlayer.getInstance().getCache().setCacheSize(cacheSize);
 							CastyServer.getInstance().startServer(hostname, port);
 							return null;
 						}
@@ -173,12 +176,12 @@ public class CastyMain extends JFrame {
 		addressLabel.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mouseClicked(MouseEvent e) {
-				if (!addressLabel.getText().startsWith("http://") && !addressLabel.getText().startsWith("https://"))
+				if (!addressLabel.getText().contains("http://") && !addressLabel.getText().contains("https://"))
 					return;
 				Desktop desktop = Desktop.isDesktopSupported() ? Desktop.getDesktop() : null;
 				if (desktop != null && desktop.isSupported(Desktop.Action.BROWSE)) {
 					try {
-						desktop.browse(new URI(addressLabel.getText()));
+						desktop.browse(new URI(addressLabel.getText().replaceAll("<[^>]+>", "").strip()));
 					} catch (Exception ignored) {}
 				}
 			}
@@ -194,10 +197,6 @@ public class CastyMain extends JFrame {
 		try {
 			ArrayList<Image> icons = new ArrayList<>();
 			Image icon = ImageIO.read(getClass().getResource("/html/img/app.png"));
-			icons.add(icon.getScaledInstance(256, 256, Image.SCALE_SMOOTH));
-			icons.add(icon.getScaledInstance(128, 128, Image.SCALE_SMOOTH));
-			icons.add(icon.getScaledInstance(64, 64, Image.SCALE_SMOOTH));
-			icons.add(icon.getScaledInstance(48, 48, Image.SCALE_SMOOTH));
 			icons.add(icon.getScaledInstance(32, 32, Image.SCALE_SMOOTH));
 			icons.add(new ImageIcon(getClass().getResource("/html/img/app-16x16.png")).getImage());
 			setIconImages(icons);
@@ -211,7 +210,6 @@ public class CastyMain extends JFrame {
 
 		pack();
 		setMinimumSize(getSize());
-		setSize(300, 350);
 		setLocationRelativeTo(null);
 
 		addEventListeners();
@@ -220,7 +218,6 @@ public class CastyMain extends JFrame {
 		if (SystemTray.isSupported()) {
 			try {
 				trayIcon = new TrayIcon(ImageIO.read(getClass().getResource("/html/img/app-16x16.png")));
-				trayIcon.setImageAutoSize(true);
 				trayIcon.addMouseListener(new MouseAdapter() {
 					@Override
 					public void mouseClicked(MouseEvent e) {
@@ -233,6 +230,8 @@ public class CastyMain extends JFrame {
 				e.printStackTrace();
 			}
 		}
+
+		setVisible(true);
 	}
 
 	private void addToTray() {
@@ -265,19 +264,17 @@ public class CastyMain extends JFrame {
 				toggleButton.setEnabled(true);
 				portField.setEnabled(true);
 				hostnameField.setEnabled(true);
-				cacheSizeField.setEnabled(true);
 				break;
 			case STARTING:
 				statusLabel.setText("Starting...");
 				toggleButton.setEnabled(false);
 				portField.setEnabled(false);
 				hostnameField.setEnabled(false);
-				cacheSizeField.setEnabled(false);
 				break;
 			case RUNNING:
 				statusLabel.setText("Running");
 				toggleButton.setText("Stop server");
-				addressLabel.setText(CastyServer.getInstance().getAddress());
+				addressLabel.setText("<html><font color=blue><u>" + CastyServer.getInstance().getAddress() + "</u></font></html>");
 				addressLabel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 				toggleButton.setEnabled(true);
 				break;
@@ -317,11 +314,8 @@ public class CastyMain extends JFrame {
 		// Disable JDK 11 deprecation warnings
 		System.setProperty("nashorn.args", "--no-deprecation-warning");
 
-		SwingUtilities.invokeLater(() -> {
-			JFrame frame = new CastyMain();
-			frame.setVisible(true);
-		});
-
+		// Show main form
+		new CastyMain();
 	}
 
 }

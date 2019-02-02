@@ -1,22 +1,20 @@
 package com.nexus.casty.player;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.nexus.casty.Utils;
+import com.nexus.casty.status.StatusListener;
+import com.nexus.casty.status.StatusListenersCollection;
 
 import com.google.gson.annotations.SerializedName;
-import com.nexus.casty.cache.CacheFile;
 import com.nexus.casty.cache.CacheManager;
 import com.nexus.casty.song.*;
-import com.originalnexus.ytd.*;
-import org.jetbrains.annotations.NotNull;
+import com.nexus.ytd.*;
+import uk.co.caprica.vlcj.binding.internal.libvlc_media_t;
 import uk.co.caprica.vlcj.binding.internal.libvlc_state_t;
 import uk.co.caprica.vlcj.component.AudioMediaPlayerComponent;
 import uk.co.caprica.vlcj.player.MediaPlayer;
 import uk.co.caprica.vlcj.player.MediaPlayerEventAdapter;
 
 import java.io.*;
-import java.nio.file.Files;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -36,58 +34,129 @@ public class CastyPlayer {
 	private static final int DEFAULT_VOLUME = 80;
 
 	private static final CastyPlayer ourInstance = new CastyPlayer();
-
 	private final CacheManager cache;
 
-	private MediaPlayer player;
-
+	private final MediaPlayer player;
+	private final Playlist playlist;
 	private Song currentSong;
-	private long songCount = 0;
 	private int volume = DEFAULT_VOLUME;
 
-	private final Playlist playlist = new Playlist();
+	private StatusListenersCollection<PlayerStatus> playerListeners = new StatusListenersCollection<>() {
+		@Override
+		protected PlayerStatus getOnAddListenerStatus() {
+			return getFullStatus();
+		}
+	};
+
+	private StatusListenersCollection<SongInfo> songListeners = new StatusListenersCollection<>() {
+		@Override
+		protected SongInfo getOnAddListenerStatus() {
+			return getSongInfo();
+		}
+	};
+
 
 	private CastyPlayer() {
 		try {
-			Gson gson = new GsonBuilder().setPrettyPrinting().create();
 			File cacheDir = new File("cache/");
 			File dataFile = new File(cacheDir, "cache-data.json");
-			cache = new CacheManager(cacheDir, new String[]{ YOUTUBE_PREFIX }, dataFile, gson, SongData.class);
+			cache = new CacheManager(cacheDir, dataFile);
 		} catch (IOException e) {
 			throw new RuntimeException("Could not instantiate player cache", e);
 		}
 
+		playlist = new Playlist();
+
 		// Create and setup audio player
-//		MediaPlayerFactory playerFactory = new MediaPlayerFactory(LibVlcFactory.factory().synchronise().create());
 		AudioMediaPlayerComponent playerComponent = new AudioMediaPlayerComponent();
 		player = playerComponent.getMediaPlayer();
-		player.setVolume(volume);
+		player.setVolume(DEFAULT_VOLUME);
 		player.addMediaPlayerEventListener(new MediaPlayerEventAdapter() {
 			@Override
 			public void finished(MediaPlayer mediaPlayer) {
 				next();
 			}
+
+			@Override
+			public void mediaChanged(MediaPlayer mediaPlayer, libvlc_media_t media, String mrl) {
+				songListeners.updateStatus(getSongInfo());
+				playerListeners.updateStatus(new PlayerStatus().setPercent(-1f));
+			}
+
+			@Override
+			public void playing(MediaPlayer mediaPlayer) {
+				playerListeners.updateStatus(new PlayerStatus().setState(PlayerState.PLAYING).setPercent(player.getPosition()));
+			}
+
+			@Override
+			public void paused(MediaPlayer mediaPlayer) {
+				playerListeners.updateStatus(new PlayerStatus().setState(PlayerState.PAUSED));
+			}
+
+			@Override
+			public void stopped(MediaPlayer mediaPlayer) {
+				playerListeners.updateStatus(new PlayerStatus().setState(PlayerState.STOPPED).setPercent(-1f));
+			}
+
+			@Override
+			public void lengthChanged(MediaPlayer mediaPlayer, long newLength) {
+				playerListeners.updateStatus(new PlayerStatus().setSongLength(newLength).setPercent(player.getPosition()));
+			}
 		});
 	}
+
 
 	public static CastyPlayer getInstance() {
 		return ourInstance;
 	}
 
-	public boolean playUrl(String url) {
+	private PlayerStatus getFullStatus() {
+		PlayerStatus status = new PlayerStatus();
+		if (player.isPlaying())
+			status.setState(PlayerState.PLAYING);
+		else if (player.getMediaState() == libvlc_state_t.libvlc_Paused)
+			status.setState(PlayerState.PAUSED);
+		else
+			status.setState(PlayerState.STOPPED);
+
+		status.setPercent(player.getPosition()).setVolume(volume).setSongLength(player.getLength());
+
+		return status;
+	}
+
+	private SongInfo getSongInfo() {
+		if (currentSong != null)
+			return new SongInfo(currentSong.data);
+		return new SongInfo();
+	}
+
+
+	public void addStatusListener(StatusListener listener) {
+		playerListeners.addListener(listener);
+		songListeners.addListener(listener);
+		playlist.playlistListeners.addListener(listener);
+	}
+
+	public void removeStatusListener(StatusListener listener) {
+		playerListeners.removeListener(listener);
+		songListeners.removeListener(listener);
+		playlist.playlistListeners.removeListener(listener);
+	}
+
+
+	public void playUrl(String url) {
 		Song song = getSongFromUrl(url);
 		if (song == null || !playSong(song)) {
 			System.err.println("Failed to play URL: " + url);
-			return false;
 		}
-		return true;
 	}
 
+
 	private Song getSongFromUrl(String url) {
-		if (url == null) return null;
-		Song song = getYouTubeSong(url);
-		if (song == null) song = getDirectSong(url);
-		return song;
+		if (url == null)
+			return null;
+
+		return getYouTubeSong(url);
 	}
 
 	private Song getYouTubeSong(String url) {
@@ -98,158 +167,99 @@ public class CastyPlayer {
 	}
 
 	private Song getYouTubeSong(YTExtractor ytExtractor) {
-		YTFormat ytFormat = null;
-
 		String id = ytExtractor.getYTUrl().getId();
 		String url = ytExtractor.getYTUrl().getUrl();
-		Song song;
-		boolean isNew = false;
+		Song song = new Song();
 
 		// Check cache first
-		CacheFile f = cache.getCacheFile(YOUTUBE_PREFIX, id);
-		if (f == null) return null;
-		f.getLocks().read();
-		try {
-			if (!f.exists() || f.getData() == null) {
-				f.getLocks().upgrade();
+		SongData songData = cache.getSongData(YOUTUBE_PREFIX + id);
+		if (songData == null) {
+			try {
+				ArrayList<YTFormat> formats = ytExtractor.getFormats();
+				String[] audioItags = {"251", "171", "140", "250", "249", "22", "43", "36", "17"};
+				YTFormat ytFormat = null;
+
+				for (String audioItag : audioItags) {
+					for (YTFormat format : formats) {
+						if (format.getItag().equals(audioItag)) {
+							ytFormat = format;
+							break;
+						}
+					}
+					if (ytFormat != null) break;
+				}
+
+				if (ytFormat == null) {
+					System.err.println("No appropriate format found for url");
+					return null;
+				}
+
+				if (ytFormat.isEncrypted()) {
+					YTPlayer ytPlayer = ytExtractor.getPlayer();
+					ytPlayer.decryptFormat(ytFormat);
+				}
+
+
+				// Set song data
+				songData = new SongData();
+				songData.source = url;
+				songData.sourceName = "YouTube";
+				songData.title = "Unknown title";
 				try {
-					if (f.exists()) Files.delete(f.toPath());
-
-					ArrayList<YTFormat> formats = ytExtractor.getFormats();
-					String[] audioItags = {"251", "171", "140", "250", "249", "22", "43", "36", "17"};
-
-					for (String audioItag : audioItags) {
-						for (YTFormat format : formats) {
-							if (format.getItag().equals(audioItag)) {
-								ytFormat = format;
-								break;
-							}
-						}
-						if (ytFormat != null) break;
-					}
-
-					if (ytFormat != null) {
-						if (ytFormat.isEncrypted()) {
-							YTPlayer ytPlayer = ytExtractor.getPlayer();
-							ytPlayer.decryptFormat(ytFormat);
-						}
-
-						// Download file
-						Utils.downloadFile(ytFormat.getURL(), f);
-						isNew = true;
-
-						// Set song data
-						SongData data = new SongData();
-						data.source = url;
-						data.sourceName = "YouTube";
-						try {
-							data.title = ytExtractor.getTitle();
-						} catch (IOException e) {
-							System.err.println("Could not extract title");
-							e.printStackTrace();
-						}
-
-						data.container = YTFormats.ItagsMap.get(ytFormat.getItag()).Container.toLowerCase();
-						if (ytFormat.getItag().equals("140")) data.specialDemux = true;
-						data.filename = ((data.title != null) ? data.title : YOUTUBE_PREFIX + id) + "." + data.container;
-
-						data.thumbnail = ytExtractor.getThumbnailUrl();
-						data.thumbnailFull = ytExtractor.getFullThumbnailUrl();
-						data.download = "download/" + YOUTUBE_PREFIX + "/" + id;
-						f.setData(data);
-					}
-					else {
-						System.err.println("No appropriate format found for url");
-					}
-				} catch (Exception e) {
-					// Try to delete the file since it could be corrupt
-					try {
-						if (f.exists()) Files.delete(f.toPath());
-					} catch (Exception ignored) {}
-					throw e;
-				} finally {
-					f.getLocks().downgrade();
-				}
-			}
-
-			if (f.exists() && f.isFile()) {
-				f.updateAccessTime();
-				if (isNew) {
-					cache.saveData();
-					cache.requestCacheClean();
+					songData.title = ytExtractor.getTitle();
+				} catch (IOException e) {
+					System.err.println("Could not extract title");
+					e.printStackTrace();
 				}
 
-				song = new Song();
-				song.file = f;
-				song.data = f.getData();
-				song.streamUrl = song.file.getPath();
-				song.ytExtractor = ytExtractor;
-				return song;
-			}
+				songData.container = YTFormats.ItagsMap.get(ytFormat.getItag()).Container.toLowerCase();
+				if (ytFormat.getItag().equals("140"))
+					songData.specialDemux = true;
+				songData.filename = ((songData.title != null) ? songData.title : YOUTUBE_PREFIX + id) + "." + songData.container;
 
-		} catch (Exception e) {
-			System.err.println("Failed to parse and download YouTube url");
-			e.printStackTrace();
-			f.getLocks().readRelease();
+				songData.thumbnail = ytExtractor.getThumbnailUrl();
+				songData.thumbnailFull = ytExtractor.getFullThumbnailUrl();
+
+				song.streamUrl = ytFormat.getURL();
+
+			} catch (Exception e) {
+				System.err.println("Failed to parse and download YouTube url");
+				e.printStackTrace();
+				return null;
+			}
+		} else {
+			song.streamUrl = cache.getCacheFilePath(YOUTUBE_PREFIX + id).getPath();
 		}
 
-		return null;
-	}
+		song.cacheId = YOUTUBE_PREFIX + id;
+		song.data = songData;
+		song.ytExtractor = ytExtractor;
 
-	private Song getDirectSong(String url) {
-		Song song = new Song();
-		song.streamUrl = url;
-		song.file = null;
-		song.ytExtractor = null;
-		song.data = new SongData();
-		song.data.title = url;
-		song.data.source = url;
-		song.data.sourceName = "Direct URL";
-		song.data.download = url;
 		return song;
 	}
 
-	@SuppressWarnings("BooleanMethodIsAlwaysInverted")
-	private synchronized boolean playSong(@NotNull Song song) {
-		boolean success = false;
-		try {
-			player.stop();
+	private synchronized boolean playSong(Song song) {
+		if (song.streamUrl != null) {
+			boolean demux = (song.data != null) && song.data.specialDemux;
 
-			if (currentSong != null && currentSong.file != null) currentSong.file.getLocks().readRelease();
-			String lastStreamUrl = (currentSong != null) ? currentSong.streamUrl : null;
+			System.out.println(song.streamUrl);
+			currentSong = song;
+			if (player.startMedia(song.streamUrl, demux ? "demux=avformat" : "", "http-reconnect"))
+				return true;
+
 			currentSong = null;
-
-			if (song.streamUrl != null) {
-				boolean demux = (song.data != null) && song.data.specialDemux;
-				success = player.startMedia(song.streamUrl, demux ? "demux=avformat" : "", "http-reconnect");
-
-				if (success) {
-					if (lastStreamUrl == null || !lastStreamUrl.equals(song.streamUrl)) songCount++;
-					currentSong = song;
-				}
-			}
-		} catch (Exception e) {
-			System.err.println("Player internal error");
-			e.printStackTrace();
-		} finally {
-			if (!success && song.file != null) song.file.getLocks().readRelease();
 		}
-
-		return success;
+		return false;
 	}
 
-	public synchronized boolean playPause() {
-		if (player == null) return false;
-		if (player.getMediaState() == libvlc_state_t.libvlc_Stopped || player.getMediaState() == libvlc_state_t.libvlc_Paused) {
+	public synchronized void playPause() {
+		if (player.getMediaState() == libvlc_state_t.libvlc_Stopped || player.getMediaState() == libvlc_state_t.libvlc_Paused)
 			player.play();
-		}
-		else {
+		else
 			player.pause();
-		}
-		return true;
 	}
 
-	public synchronized boolean next() {
+	public synchronized void next() {
 		String url;
 
 		// Check playlist first
@@ -258,7 +268,7 @@ public class CastyPlayer {
 			url = item.url;
 		}
 		else {
-			if (currentSong == null || currentSong.ytExtractor == null) return false;
+			if (currentSong == null || currentSong.ytExtractor == null) return;
 			try {
 				YTExtractor nextYTExtractor = currentSong.ytExtractor.getNextVideo();
 				new Thread(() -> {
@@ -266,78 +276,49 @@ public class CastyPlayer {
 					if (song == null) return;
 					playSong(song);
 				}).start();
-				return true;
+				return;
 			} catch (IOException e) {
 				System.err.println("Could extract next url for current song");
 				e.printStackTrace();
-				return false;
+				return;
 			}
 		}
 
 		new Thread(() -> playUrl(url)).start();
-		return true;
 	}
 
-	public synchronized boolean previous() {
-		if (player == null) return false;
-		if (getCurrentSongLength() * player.getPosition() > 5000) return setPosition(0);
+	public synchronized void previous() {
+		if (player == null) return;
+		if (player.getLength() * player.getPosition() > 5000) {
+			setPosition(0);
+			return;
+		}
 		PlaylistItem item = playlist.previous();
 		if (item != null) {
 			new Thread(() -> playUrl(item.url)).start();
-			return true;
 		}
-		else return setPosition(0);
+		else {
+			setPosition(0);
+		}
 	}
 
 	public synchronized void reset() {
 		player.stop();
-		volume = DEFAULT_VOLUME;
-		player.setVolume(volume);
-
-		if (currentSong != null && currentSong.file != null) currentSong.file.getLocks().readRelease();
+		player.setVolume(DEFAULT_VOLUME);
 		currentSong = null;
-		songCount = 0;
 		playlist.reset();
-		cache.requestCacheClean();
 	}
 
-	public synchronized Status getStatus() {
-		Status status = new Status();
-		if (player.isPlaying()) {
-			status.state = PlayerState.PLAYING;
-			status.percent = player.getPosition();
-		}
-		else if (player.getMediaState() == libvlc_state_t.libvlc_Paused) {
-			status.state = PlayerState.PAUSED;
-			status.percent = player.getPosition();
-		}
-		else {
-			status.state = PlayerState.STOPPED;
-		}
-		status.songCount = songCount;
-		status.volume = player.getVolume();
-		status.playlist = playlist.getStatus();
-		return status;
-	}
 
-	public synchronized SongInfo getCurrentSongInfo() {
-		if (currentSong == null) return null;
-		return currentSong.data;
-	}
-
-	public synchronized long getCurrentSongLength() {
-		return (player == null) ? -1 : player.getLength();
-	}
-
-	public synchronized boolean setPosition(float percent) {
+	public synchronized void setPosition(float percent) {
 		player.setPosition(percent);
-		return true;
+		playerListeners.updateStatus(new PlayerStatus().setPercent(percent));
 	}
 
-	public synchronized boolean setVolume(int volume) {
+	public synchronized void setVolume(int volume) {
 		player.setVolume(volume);
 		this.volume = volume;
-		return true;
+		playerListeners.updateStatus(new PlayerStatus().setVolume(volume));
 	}
 
 	public CacheManager getCache() {
@@ -348,16 +329,53 @@ public class CastyPlayer {
 		return playlist;
 	}
 
-	public boolean playlistPlayItem(int index) {
+	public void playlistPlayItem(int index) {
 		PlaylistItem item = playlist.setIndex(index);
-		if (item == null) return false;
+		if (item == null)
+			return;
 		new Thread(() -> playUrl(item.url)).start();
-		return true;
 	}
 
-	public boolean loadCachePlaylist() {
-		ArrayList<SongData> array = cache.getDataArray(SongData::new);
-		ArrayList<PlaylistItem> list;
+
+	public synchronized void cacheCurrentSong() {
+		if (currentSong == null)
+			return;
+
+		String streamUrl = currentSong.streamUrl;
+		SongData data = currentSong.data;
+		String id = currentSong.cacheId;
+		File file = cache.getCacheFilePath(id);
+
+		new Thread(() -> {
+			if (!streamUrl.equals(file.getPath())) {
+				try (FileOutputStream fs = new FileOutputStream(file)){
+					Utils.downloadToStream(streamUrl, fs);
+				} catch (IOException e) {
+					e.printStackTrace();
+					return;
+				}
+			}
+
+			cache.computeSongDataIfAbsent(id, data);
+
+			synchronized (this) {
+				data.download = "download/" + id;
+				songListeners.updateStatus(getSongInfo());
+			}
+		}).start();
+	}
+
+	public synchronized void uncacheCurrentSong() {
+		if (currentSong == null)
+			return;
+
+		cache.removeSongData(currentSong.cacheId);
+		currentSong.data.download = "";
+	}
+
+	public void loadCachePlaylist() {
+		List<SongData> array = cache.getSongDataArray();
+		List<PlaylistItem> list;
 		list = array.stream()
 				.map(songData -> {
 					PlaylistItem item = new PlaylistItem();
@@ -366,10 +384,9 @@ public class CastyPlayer {
 					return item;
 				})
 				.sorted(Comparator.comparing(item -> item.title))
-				.collect(Collectors.toCollection(ArrayList::new));
+				.collect(Collectors.toList());
 
 		playlist.load(list);
-		return true;
 	}
 
 }

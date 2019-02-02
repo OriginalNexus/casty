@@ -1,107 +1,115 @@
 package com.nexus.casty.player;
 
-import java.util.ArrayList;
+import com.nexus.casty.status.StatusListenersCollection;
+
 import java.util.LinkedList;
+import java.util.List;
 
 public class Playlist {
 
 	private final LinkedList<PlaylistItem> playlist = new LinkedList<>();
-	private final PlaylistStatus status = new PlaylistStatus();
 	private int nextIndex = -1;
+	private int index = -1;
+	private boolean repeat = false;
 
-	public synchronized boolean addItem(PlaylistItem item) {
-		if (item == null) return false;
+	StatusListenersCollection<PlaylistStatus> playlistListeners = new StatusListenersCollection<>() {
+		@Override
+		protected PlaylistStatus getOnAddListenerStatus() {
+			return new PlaylistStatus().setIndex(index).setRepeat(repeat).setItems(getItems());
+		}
+	};
+
+	public synchronized void addItem(PlaylistItem item) {
+		if (item == null) return;
 		playlist.add(item);
-		if (status.index < 0 && (nextIndex < 0 || nextIndex >= playlist.size())) nextIndex = playlist.size() - 1;
-		status.version++;
-		return true;
+		if (index < 0 && (nextIndex < 0 || nextIndex >= playlist.size())) nextIndex = playlist.size() - 1;
+
+		playlistListeners.updateStatus(new PlaylistStatus().setItems(getItems()));
 	}
 
 	synchronized PlaylistItem next() {
-		status.index = getNextIndex();
+		int index = getNextIndex();
+		if (index < 0) return null;
+		this.index = index;
 		nextIndex = -1;
-		if (status.index < 0) return null;
-		return playlist.get(status.index);
+		playlistListeners.updateStatus(new PlaylistStatus().setIndex(index));
+		return playlist.get(index);
 	}
 
 	synchronized PlaylistItem previous() {
 		int index = getPreviousIndex();
 		if (index < 0) return null;
-		status.index = index;
+		this.index = index;
 		nextIndex = -1;
-		return playlist.get(status.index);
+		playlistListeners.updateStatus(new PlaylistStatus().setIndex(index));
+		return playlist.get(index);
 	}
 
-	public synchronized boolean removeItem(int index) {
-		if (index < 0 || index >= playlist.size()) return false;
+	public synchronized void removeItem(int index) {
+		if (index < 0 || index >= playlist.size()) return;
 		playlist.remove(index);
-		if (index == status.index) {
-			nextIndex = status.index;
-			status.index = -1;
+		if (index == this.index) {
+			nextIndex = this.index;
+			this.index = -1;
 		}
-		else if (index < status.index){
-			status.index--;
+		else if (index < this.index){
+			this.index--;
 		}
-		status.version++;
-		return true;
+		playlistListeners.updateStatus(new PlaylistStatus().setIndex(this.index).setItems(getItems()));
 	}
 
-	public synchronized PlaylistItem[] toArray() {
+	private synchronized PlaylistItem[] getItems() {
 		return playlist.toArray(new PlaylistItem[0]);
 	}
 
 	public synchronized void setRepeat(boolean repeat) {
-		status.repeat = repeat;
-	}
-
-	PlaylistStatus getStatus() {
-		return status;
+		this.repeat = repeat;
+		playlistListeners.updateStatus(new PlaylistStatus().setRepeat(repeat));
 	}
 
 	synchronized PlaylistItem setIndex(int index) {
 		if (index < 0 || index >= playlist.size()) return null;
-		status.index = index;
+		this.index = index;
 		nextIndex = -1;
+		playlistListeners.updateStatus(new PlaylistStatus().setIndex(index));
 		return playlist.get(index);
 	}
 
-	synchronized void load(ArrayList<PlaylistItem> array) {
+	synchronized void load(List<PlaylistItem> array) {
 		playlist.clear();
 		playlist.addAll(array);
-		status.index = -1;
+		this.index = -1;
 		nextIndex = playlist.isEmpty() ? -1 : 0;
-		status.version++;
+		playlistListeners.updateStatus(new PlaylistStatus().setIndex(index).setItems(getItems()));
 	}
 
 	synchronized void reset() {
 		playlist.clear();
-		status.index = -1;
+		index = -1;
 		nextIndex = -1;
-		status.repeat = false;
-		status.version = 0;
+		repeat = false;
 	}
 
 	private synchronized int getNextIndex() {
 		if (playlist.size() == 0) return -1;
 		if (nextIndex >= 0) {
-			if (nextIndex >= playlist.size() && status.repeat) return 0;
+			if (nextIndex >= playlist.size() && repeat) return 0;
 			else if (nextIndex >= playlist.size()) return -1;
 			else return nextIndex;
 		}
-		return status.index >= 0 ? (status.index + 1 >= playlist.size() ? (status.repeat ? 0 : -1) : (status.index + 1)) : -1;
+		return index >= 0 ? (index + 1 >= playlist.size() ? (repeat ? 0 : -1) : (index + 1)) : -1;
 	}
 
 	private int getPreviousIndex() {
 		if (playlist.size() == 0) return -1;
-		if (status.index > 0 && status.index < playlist.size()) return status.index - 1;
-		if (status.index == 0 && status.repeat) return playlist.size() - 1;
-		if (status.index == 0) return -1;
-		if (status.index < 0) {
+		if (index > 0 && index < playlist.size()) return index - 1;
+		if (index == 0 && repeat) return playlist.size() - 1;
+		if (index == 0) return -1;
+		if (index < 0) {
 			if (nextIndex >= playlist.size()) return playlist.size() - 1;
 			if (nextIndex > 0) return nextIndex - 1;
-			if (nextIndex == 0 && status.repeat) return playlist.size() - 1;
+			if (nextIndex == 0 && repeat) return playlist.size() - 1;
 		}
 		return -1;
 	}
-
 }

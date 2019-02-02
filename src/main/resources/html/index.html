@@ -1,120 +1,108 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 	<meta charset="utf-8">
 	<link rel="shortcut icon" sizes="16x16" href="img/app-16x16.png">
 	<link rel="shortcut icon" sizes="32x32 48x48 64x64 128x128" href="img/app.png">
 	<meta name="theme-color" content="#3f51b5">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
 	<title>Casty Player</title>
 
-	<link rel="stylesheet" href="http://fonts.googleapis.com/css?family=Roboto:300,400,500,700" type="text/css">
-	<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
-	<link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.indigo-pink.min.css">
+	<link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,500,500i,700,700i|Roboto+Mono:300,400,700|Roboto+Slab:300,400,700" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daemonite-material@4.1.1/css/material.min.css">
 	<link rel="stylesheet" type="text/css" href="css/style.css">
 
 </head>
 
 <body>
-<div id="page-wrapper" class="flex-vertical">
-	<div id="top-wrapper" class="flex-noshrink">
-		<div class="mdl-grid">
-			<div class="mdl-cell mdl-cell--3-col-desktop mdl-cell--3-col-tablet mdl-cell--1-col-phone flex flex-align">
+<div id="page-wrapper" class="d-flex flex-column">
+	<div id="top-wrapper" class="container-fluid shadow-1">
+		<div class="row p-3">
+			<div class="col-2 col-sm-3 d-flex align-items-center pl-0">
 				<img class="app-icon" src="img/app.png">
-				<p class="app-title mdl-typography--display-1">Casty</p>
+				<h3 class="ml-3 mb-0 d-none d-sm-block">Casty</h3>
 			</div>
-			<div class="mdl-cell mdl-cell--6-col-desktop mdl-cell--5-col-tablet mdl-cell--3-col-phone flex flex-align flex-center">
-				<div id="search-textfield-group" class="mdl-textfield mdl-js-textfield flex-grow">
-					<input class="mdl-textfield__input" id="search-textfield">
-					<label class="mdl-textfield__label" for="search-textfield">Search</label>
+			<div class="col-10 col-sm-9 d-flex align-items-center justify-content-center pr-0">
+				<div class="form-group flex-grow-1 mb-0">
+					<div class="floating-label textfield-box">
+						<label for="search-textfield">Search</label>
+						<input class="form-control" id="search-textfield" type="text">
+					</div>
 				</div>
 			</div>
-			<div class="mdl-cell mdl-cell--3-col-desktop mdl-cell--12-col-tablet flex flex-align flex-end flex-noshrink">
-				<button id="search-btn" class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--primary">Search</button>
-			</div>
-			<div id="offline-wrapper" class="mdl-cell mdl-cell--12-col flex flex-align" style="display: none;">
-				<p class="text-danger">Connection lost</p>
-				<button id="connection-retry-btn" class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--primary">Refresh <i class="material-icons">refresh</i></button>
+		</div>
+		<div id="offline-wrapper" class="row p-3" style="display: none;">
+			<div class="col-12 px-0">
+				<span class="text-danger">Connection lost</span>
+				<button id="connection-retry-btn" type="button" class="btn btn-primary ml-3">Refresh <i class="material-icons">refresh</i></button>
 			</div>
 		</div>
 	</div>
 
-	<div id="content-wrapper" class="flex-grow">
-		<div id="content-overlay" class="flex flex-align flex-center" style="display: none;">
-			<div class="mdl-spinner mdl-js-spinner"></div>
-		</div>
-		<div class="mdl-grid container">
-			<div id="results-wrapper" class="mdl-cell mdl-cell--12-col" style="display: none;">
-				<h3>Search results</h3>
-				<ul id="results" class="mdl-list">
+	<div id="content-wrapper" class="flex-grow-1">
+		<div id="results-wrapper" class="container" style="display: none;">
+			<div class="row">
+				<div class="col">
+					<h3 class="mt-5">Search results</h3>
+					<ul id="results" class="list-group list-group-flush">
 
-				</ul>
+					</ul>
+				</div>
 			</div>
 		</div>
 	</div>
 
-	<div id="bottom-wrapper" class="flex-noshrink">
-		<div id="playlist-wrapper" class="mdl-grid">
-			<div id="playlist-card" class="mdl-card mdl-shadow--2dp" style="display: none;">
-				<div class="mdl-card__title">
-					<h2 class="mdl-card__title-text">Playlist</h2>
-				</div>
-				<button id="playlist-repeat-btn" class="mdl-button mdl-js-button mdl-button--icon mdl-js-ripple-effect">
-					<i class="material-icons">repeat</i>
-				</button>
-				<button id="playlist-cache-btn" class="mdl-button mdl-js-button mdl-button--icon mdl-js-ripple-effect">
-					<i class="material-icons">cloud_off</i>
-				</button>
-				<ul id="playlist" class="mdl-list">
+	<div id="bottom-wrapper" class="shadow-1">
+		<div id="playlist-wrapper">
+			<div id="playlist-card" class="card" style="display: none;">
+				<h2 class="my-2 ml-3">Playlist</h2>
+				<button id="playlist-repeat-btn" class="btn btn-flat btn-icon"><i class="material-icons">repeat</i></button>
+				<button id="playlist-cache-btn" class="btn btn-flat btn-icon"><i class="material-icons">cloud_off</i></button>
+				<ul id="playlist" class="list-group list-group-flush">
 					
 				</ul>
 			</div>
 		</div>
 
 		<div id="player">
-			<div id="progress-bar" class="mdl-progress mdl-js-progress" tabindex="0" style="display: none;"></div>
-			<p class="time mdl-typography--caption"></p>
-			<div class="mdl-grid">
-				<div class="mdl-cell mdl-cell--5-col-desktop mdl-cell--3-col-tablet mdl-cell--4-col-phone player-height flex flex-align">
-					<a class="thumbnail" target="_blank" style="background-image: url(img/generic-song.png);"></a>
-					<div class="flex-vertical flex-grow" style="align-self: stretch; justify-content: space-around; align-items: flex-start; min-width: 0;">
-						<p class="title ellipsis"></p>
-						<a class="source ellipsis" target="_blank"></a>
-					</div>
-				</div>
-				<div class="mdl-cell mdl-cell--hide-desktop mdl-cell--hide-tablet mdl-cell--1-col-phone player-height flex flex-start flex-align">
-					<button class="download-btn mdl-button mdl-js-button mdl-button--icon mdl-js-ripple-effect flex-noshrink" type="button" disabled>
-						<i class="material-icons">file_download</i>
-					</button>
-				</div>
-				<div id="player-controls" class="mdl-cell mdl-cell--2-col-desktop mdl-cell--2-col-tablet mdl-cell--2-col-phone player-height flex flex-align flex-center">
-					<button id="previous-btn" class="mdl-button mdl-js-button mdl-button--icon mdl-js-ripple-effect flex-noshrink" type="button" disabled>
-						<i class="material-icons">skip_previous</i>
-					</button>
-					<button id="play-pause-btn" class="mdl-button mdl-js-button mdl-button--icon mdl-js-ripple-effect mdl-button--icon-large flex-noshrink" type="button" disabled>
-						<i class="material-icons icon-play">play_arrow</i>
-						<i class="material-icons icon-pause">pause</i>
-					</button>
-					<button id="next-btn" class="mdl-button mdl-js-button mdl-button--icon mdl-js-ripple-effect flex-noshrink" type="button" disabled>
-						<i class="material-icons">skip_next</i>
-					</button>
-				</div>
-				<div class="mdl-cell mdl-cell--5-col-desktop mdl-cell--3-col-tablet mdl-cell--1-col-phone player-height flex flex-end flex-align">
-					<button class="download-btn mdl-cell--hide-phone mdl-button mdl-js-button mdl-button--icon mdl-js-ripple-effect flex-noshrink" type="button" disabled>
-						<i class="material-icons">file_download</i>
-					</button>
-					<button id="volume-btn" class="mdl-button mdl-js-button mdl-button--icon mdl-js-ripple-effect flex-noshrink" type="button" disabled>
-						<i class="material-icons">volume_up</i>
-					</button>
-					<div id="volume-wrapper" class="mdl-shadow--2dp" style="display: none;">
-						<div id="volume-slider-wrapper">
-							<input id="volume-slider" class="mdl-slider mdl-js-slider" type="range" min="0" max="100" value="80" tabindex="0">
+			<div id="progress-bar" class="progress" style="display: none;">
+				<div class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+			</div>
+			<p class="time"></p>
+			<div class="container-fluid">
+				<div class="row px-3 pt-3 pb-1 pb-sm-3">
+					<div class="col-12 col-sm-5 d-flex align-items-center pl-0">
+						<a class="thumbnail flex-shrink-0" target="_blank" style="background-image: url(img/generic-song.png);"></a>
+						<div class="d-flex flex-column flex-grow-1 justify-content-between align-items-start ml-3" style="min-width: 0">
+							<span class="title text-truncate"></span>
+							<a class="source text-truncate" target="_blank"></a>
 						</div>
 					</div>
-					<button id="playlist-toggle-btn" class="mdl-button mdl-js-button mdl-button--icon mdl-js-ripple-effect flex-noshrink" type="button">
-						<i class="material-icons">queue_music</i>
-					</button>
+					<div class="col-3 d-flex align-items-center d-sm-none pl-0 mt-2">
+						<button class="save-btn btn btn-flat btn-icon flex-shrink-0" disabled><i class="material-icons">save</i></button>
+						<button class="download-btn btn btn-flat btn-icon flex-shrink-0" style="display: none!important;"><i class="material-icons">file_download</i></button>
+					</div>
+					<div id="player-controls" class="col-6 col-sm-2 d-flex align-items-center justify-content-center mt-2 mt-sm-2">
+						<button id="previous-btn" class="btn btn-flat btn-icon flex-shrink-0" disabled><i class="material-icons">skip_previous</i></button>
+						<button id="play-pause-btn" class="btn btn-flat btn-icon flex-shrink-0" disabled>
+							<i class="material-icons icon-play">play_arrow</i>
+							<i class="material-icons icon-pause">pause</i>
+						</button>
+						<button id="next-btn" class="btn btn-flat btn-icon flex-shrink-0" disabled><i class="material-icons">skip_next</i></button>
+					</div>
+					<div class="col-3 col-sm-5 d-flex align-items-center justify-content-end pr-0 mt-2 mt-sm-2">
+						<button class="download-btn btn btn-flat btn-icon flex-shrink-0 d-none d-sm-block" style="display: none!important;"><i class="material-icons">file_download</i></button>
+						<button class="save-btn btn btn-flat btn-icon flex-shrink-0 d-none d-sm-block" disabled><i class="material-icons">save</i></button>
+						<button id="volume-btn" class="btn btn-flat btn-icon flex-shrink-0" type="button"><i class="material-icons">volume_up</i></button>
+						<div id="volume-wrapper" style="display: none;">
+							<div id="volume-slider-wrapper" class="card flex-row">
+								<input id="volume-slider" type="range" class="custom-range">
+							</div>
+						</div>
+						<button id="playlist-toggle-btn" class="btn btn-flat btn-icon flex-shrink-0" type="button"><i class="material-icons">queue_music</i></button>
+					</div>
 				</div>
 			</div>
 		</div>
@@ -122,8 +110,10 @@
 	</div>
 </div>
 
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
-<script defer src="https://code.getmdl.io/1.3.0/material.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/daemonite-material@4.1.1/js/material.min.js"></script>
 <script src="js/main.js"></script>
 
 </body>

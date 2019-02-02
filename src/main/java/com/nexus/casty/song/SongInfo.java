@@ -1,16 +1,16 @@
 package com.nexus.casty.song;
 
 public class SongInfo {
-	public String title;
-	public String source;
-	public String sourceName;
-	public String thumbnail;
-	public String thumbnailFull;
-	public String download;
+	public String title = "";
+	public String source = "";
+	public String sourceName = "";
+	public String thumbnail = "img/generic-song.png";
+	public String thumbnailFull = "";
+	public String download = "";
 
-	SongInfo() {}
+	public SongInfo() {}
 
-	SongInfo(SongData songInfo) {
+	public SongInfo(SongInfo songInfo) {
 		this.title = songInfo.title;
 		this.source = songInfo.source;
 		this.sourceName = songInfo.sourceName;
