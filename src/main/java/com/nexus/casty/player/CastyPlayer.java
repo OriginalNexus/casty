@@ -356,12 +356,10 @@ public class CastyPlayer {
 				}
 			}
 
+			data.download = "download/" + id;
 			cache.computeSongDataIfAbsent(id, data);
+			songListeners.updateStatus(getSongInfo());
 
-			synchronized (this) {
-				data.download = "download/" + id;
-				songListeners.updateStatus(getSongInfo());
-			}
 		}).start();
 	}
 

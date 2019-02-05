@@ -12,6 +12,7 @@ html, body {
 }
 
 /*** Page components ***/
+
 /* Main components */
 #page-wrapper {
 	height: 100%;
@@ -70,15 +71,15 @@ html, body {
 #playlist-repeat-btn {
 	position: absolute;
 	top: 4px;
-	right: 16px;
+	right: 4px;
 }
 #playlist-cache-btn {
 	position: absolute;
 	top: 4px;
-	right: 64px;
+	right: 52px;
 }
 #playlist:empty::after {
-	content: "Empty";
+	content: 'Empty';
 	padding-left: 16px;
 	padding-top: 16px;
 }
@@ -119,7 +120,7 @@ html, body {
 }
 
 #progress-bar::after {
-	content: "";
+	content: '';
 	position: absolute;
 	top: -15px;
 	bottom: -15px;
