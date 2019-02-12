@@ -37,7 +37,6 @@ function createWebSocket() {
     ws.onerror = function(err) {
         console.log('WebSocket error!');
         console.log(err);
-        updateStatus();
     };
 }
 

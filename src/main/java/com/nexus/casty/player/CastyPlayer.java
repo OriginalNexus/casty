@@ -46,7 +46,12 @@ public class CastyPlayer {
 		player.addMediaPlayerEventListener(new MediaPlayerEventAdapter() {
 			@Override
 			public void finished(MediaPlayer mediaPlayer) {
-				next();
+				new Timer().schedule(new TimerTask() {
+					@Override
+					public void run() {
+						next();
+					}
+				}, 500);
 			}
 
 			@Override
