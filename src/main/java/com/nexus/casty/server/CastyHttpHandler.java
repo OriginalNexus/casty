@@ -20,7 +20,6 @@ class CastyHttpHandler extends AbstractHandler {
 	}
 
 	private boolean handleGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
-		String responseBody;
 		Gson gson = new Gson();
 		String httpPath = request.getRequestURI();
 
@@ -28,18 +27,19 @@ class CastyHttpHandler extends AbstractHandler {
 
 		if (httpPath.startsWith("/download/")) {
 			handleDownload(request, response);
-			return true;
 		}
-		if ("/results".equals(httpPath)) {
+		else if ("/favicon.ico".equals(httpPath)) {
+			getClass().getResourceAsStream("/html/img/app-16x16.png").transferTo(response.getOutputStream());
+		}
+		else if ("/results".equals(httpPath)) {
 			String query = request.getParameter("q");
 			if (query == null)
 				query = "";
-			responseBody = gson.toJson(YTSearch.performSearch(query));
+
+			response.getOutputStream().print(gson.toJson(YTSearch.performSearch(query)));
 		} else {
 			return false;
 		}
-
-		response.getOutputStream().print(responseBody);
 		return true;
 	}
 
