@@ -10,10 +10,14 @@ import java.util.regex.Pattern;
 public class YTFormat {
 
 	static final Comparator<YTFormat> YTFormatComparator = (f1, f2) -> {
-        if (f1.getItag().equals(f2.getItag())) return 0;
+        if (f1.getItag().equals(f2.getItag()))
+            return 0;
+
         for (Map.Entry<String, YTFormatInfo> entry : YTFormats.ItagsMap.entrySet()) {
-            if (entry.getKey().equals(f1.getItag())) return -1;
-            else if (entry.getKey().equals(f2.getItag())) return 1;
+            if (entry.getKey().equals(f1.getItag()))
+                return -1;
+            else if (entry.getKey().equals(f2.getItag()))
+                return 1;
         }
         return f1.getItag().compareTo(f2.getItag());
     };
@@ -28,10 +32,13 @@ public class YTFormat {
         while (m.find()) {
             if (m.group("key").equals("url")) {
 				url = URLDecoder.decode(m.group("value"), StandardCharsets.UTF_8);
-				if (!url.contains("ratebypass=yes")) url += "&ratebypass=yes";
+				if (!url.contains("ratebypass=yes"))
+				    url += "&ratebypass=yes";
 			}
-            if (m.group("key").equals("itag")) itag = m.group("value");
-            if (m.group("key").equals("s")) s = m.group("value");
+            if (m.group("key").equals("itag"))
+                itag = m.group("value");
+            if (m.group("key").equals("s"))
+                s = m.group("value");
         }
     }
 
@@ -57,7 +64,8 @@ public class YTFormat {
     }
 
     void decrypt(String decryptedSignature) {
-        if (!isEncrypted()) return;
+        if (!isEncrypted())
+            return;
         url += "&signature=" + decryptedSignature;
         s = null;
     }

@@ -3,25 +3,18 @@ package com.nexus.casty.server;
 import com.google.gson.Gson;
 import com.nexus.casty.player.*;
 import com.nexus.casty.song.SongInfo;
-import com.nexus.casty.status.StatusListener;
 import org.eclipse.jetty.websocket.api.Session;
 
 
-public class StatusUpdateHandler implements StatusListener {
-    private Gson gson = new Gson();
-    private Session session;
+class StatusListener {
+    private final Gson gson = new Gson();
+    final Session session;
 
-    StatusUpdateHandler(Session session) {
+    StatusListener(Session session) {
         this.session = session;
     }
 
-    @Override
-    public void onUpdate(Object status) {
-        if (!session.isOpen()) {
-            CastyPlayer.getInstance().removeStatusListener(this);
-            return;
-        }
-
+    void onUpdate(Object status) {
         String scope;
         if (status instanceof PlayerStatus)
             scope = "player";

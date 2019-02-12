@@ -7,6 +7,7 @@ import org.eclipse.jetty.websocket.api.WebSocketAdapter;
 
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.function.Supplier;
 
 public class CastyWebSocketHandler extends WebSocketAdapter {
 
@@ -18,8 +19,12 @@ public class CastyWebSocketHandler extends WebSocketAdapter {
     @Override
     public void onWebSocketConnect(Session session) {
         System.out.println("Client connect: " + session.getRemoteAddress().getAddress());
-        StatusUpdateHandler handler = new StatusUpdateHandler(session);
-        CastyPlayer.getInstance().addStatusListener(handler);
+        StatusListener handler = new StatusListener(session);
+
+        for (Supplier<Object> s : CastyServer.getInstance().suppliers)
+            handler.onUpdate(s.get());
+
+        CastyServer.getInstance().listeners.add(handler);
     }
 
     @Override
@@ -80,10 +85,8 @@ public class CastyWebSocketHandler extends WebSocketAdapter {
                     case "add":
                         String url = request.params.get("url").getAsString();
                         String title = request.params.get("title").getAsString();
-                        if (title == null)
-                            title = url;
-
                         PlaylistItem item = new PlaylistItem();
+
                         item.url = URLDecoder.decode(url, StandardCharsets.UTF_8);
                         item.title = URLDecoder.decode(title, StandardCharsets.UTF_8);
                         CastyPlayer.getInstance().getPlaylist().addItem(item);

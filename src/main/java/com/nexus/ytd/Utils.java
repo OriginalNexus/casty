@@ -6,14 +6,10 @@ import java.io.StringWriter;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 class Utils {
 
-	private static final String CHROME_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36";
+	private static final String CHROME_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/71.0.3578.98 Safari/537.36";
 
     static String extractJSObject(String s, int index) {
         int cnt = 0;
@@ -42,41 +38,11 @@ class Utils {
     }
 
     static String downloadURLToString(String url) throws IOException {
-    	return downloadURLToString(url, null);
-	}
-
-    static String downloadURLToString(String url, String cookie) throws IOException {
-        return downloadURLToString(url, cookie, null);
-    }
-
-	static String downloadURLToString(String url, String cookie, Map<String, String> responseCookies) throws IOException {
-		int len, BUF_LEN = 1024 * 1024;
 		StringWriter output = new StringWriter();
-
 		URLConnection con = new URL(url).openConnection();
-
 		con.setRequestProperty("User-Agent", CHROME_USER_AGENT);
-		if (cookie != null && !cookie.isEmpty()) {
-			con.setRequestProperty("Cookie", cookie);
-		}
-
-		if (responseCookies != null) {
-			Map<String, List<String>> headers = con.getHeaderFields();
-			List<String> cookies = headers.get("Set-Cookie");
-			if (cookies != null) {
-				for (String c : cookies) {
-					Matcher m = Pattern.compile("^(?<name>\\S*?)=(?<value>[\\s\\S]*?);").matcher(c);
-					if (m.find()) {
-						responseCookies.put(m.group("name"), m.group("value"));
-					}
-				}
-			}
-		}
-
 		InputStreamReader input = new InputStreamReader(con.getInputStream(), StandardCharsets.UTF_8);
-
-		char[] buf = new char[BUF_LEN];
-		while ((len = input.read(buf, 0, BUF_LEN)) != -1) output.write(buf, 0, len);
+		input.transferTo(output);
 
 		return output.toString();
 	}

@@ -16,7 +16,7 @@ class CastyHttpHandler extends AbstractHandler {
 	@Override
 	public void handle(String target, Request baseRequest, HttpServletRequest request, HttpServletResponse response) throws IOException {
 		if (request.getMethod().equals("GET") && handleGet(request, response))
-					baseRequest.setHandled(true);
+			baseRequest.setHandled(true);
 	}
 
 	private boolean handleGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
@@ -30,15 +30,13 @@ class CastyHttpHandler extends AbstractHandler {
 			handleDownload(request, response);
 			return true;
 		}
-		switch (httpPath) {
-			case "/results":
-				String query = request.getParameter("q");
-				if (query == null)
-					query = "";
-				responseBody = gson.toJson(YTSearch.performSearch(query));
-				break;
-			default:
-				return false;
+		if ("/results".equals(httpPath)) {
+			String query = request.getParameter("q");
+			if (query == null)
+				query = "";
+			responseBody = gson.toJson(YTSearch.performSearch(query));
+		} else {
+			return false;
 		}
 
 		response.getOutputStream().print(responseBody);
@@ -50,9 +48,9 @@ class CastyHttpHandler extends AbstractHandler {
 
 		String id = request.getRequestURI().substring("/download/".length());
 
-		SongData data = CastyPlayer.getInstance().getCache().getSongData(id);
+		SongData data = CastyPlayer.getInstance().getCache().getData(id);
 		if (data != null) {
-			File f = CastyPlayer.getInstance().getCache().getCacheFilePath(id);
+			File f = CastyPlayer.getInstance().getCache().getFile(id);
 
 			if (f.exists() && f.isFile()) {
 				found = true;
@@ -72,7 +70,8 @@ class CastyHttpHandler extends AbstractHandler {
 			}
 		}
 
-		if (!found) response.sendError(HttpServletResponse.SC_NOT_FOUND);
+		if (!found)
+			response.sendError(HttpServletResponse.SC_NOT_FOUND);
 	}
 
 }

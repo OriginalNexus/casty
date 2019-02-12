@@ -2,37 +2,36 @@ package com.nexus.casty.cache;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
 import com.nexus.casty.Utils;
 import com.nexus.casty.song.SongData;
 
 import java.io.*;
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class CacheManager {
 
-	private final Map<String, CacheEntry> cacheMap = new HashMap<>();
-	private final File cacheDir;
-	private final File dataFile;
+	private final Map<String, SongData> cacheMap = new HashMap<>();
+	private final File cacheDir = new File("cache/");
+	private final File cacheFile = new File(cacheDir, "cache-data.json");;
 	private final Gson gson;
 
-	public CacheManager(File cacheDir, File dataFile) throws IOException {
-		this.dataFile = dataFile;
-		this.cacheDir = cacheDir;
+	public CacheManager() {
 		this.gson = new GsonBuilder().setPrettyPrinting().create();
 
 		// Create cache directory
 		if (!cacheDir.exists() && !cacheDir.mkdir()) {
-			throw new IOException("Could not create cache directory");
+			throw new RuntimeException("Could not create cache directory");
 		}
 
 		// Load data cache
-		if (dataFile != null && dataFile.exists() && dataFile.isFile()) {
-			try (FileReader fileReader = new FileReader(this.dataFile)) {
-				for (CacheEntry entry : gson.fromJson(fileReader, CacheEntry[].class)) {
-					File f = getCacheFilePath(entry.id);
+		if (cacheFile.exists() && cacheFile.isFile()) {
+			try (FileReader fileReader = new FileReader(this.cacheFile)) {
+				Map<String, SongData> map = gson.fromJson(fileReader, new TypeToken<Map<String, SongData>>(){}.getType());
+				for (Map.Entry<String, SongData> entry : map.entrySet()) {
+					File f = getFile(entry.getKey());
 					if (f.exists()) {
-						cacheMap.putIfAbsent(entry.id, entry);
+						cacheMap.putIfAbsent(entry.getKey(), entry.getValue());
 					}
 				}
 			} catch (Exception e) {
@@ -40,7 +39,7 @@ public class CacheManager {
 				e.printStackTrace();
 			}
 		}
-		saveData();
+		save();
 
 		// Remove other files from cache dir
 		File[] files = cacheDir.listFiles();
@@ -62,43 +61,37 @@ public class CacheManager {
 		}
 	}
 
-	public synchronized SongData getSongData(String id) {
-		CacheEntry entry = cacheMap.get(id);
-		return entry != null ? entry.data : null;
+	public synchronized SongData getData(String id) {
+		return cacheMap.get(id);
 	}
 
-	public File getCacheFilePath(String id) {
+	public File getFile(String id) {
 		return new File(cacheDir, Utils.stringToBase36(id));
 	}
 
-	public synchronized void computeSongDataIfAbsent(String id, SongData data) {
+	public synchronized void putData(String id, SongData data) {
 		if (data != null) {
-			CacheEntry e = new CacheEntry(id);
-			e.data = data;
-
-			cacheMap.putIfAbsent(id, e);
-			saveData();
+			cacheMap.putIfAbsent(id, data);
+			save();
 		}
 	}
 
-	public synchronized void removeSongData(String id) {
+	public synchronized void removeData(String id) {
 		cacheMap.remove(id);
-		saveData();
+		save();
 	}
 
-	private synchronized void saveData() {
-		try (FileWriter fileWriter = new FileWriter(dataFile)) {
-			gson.toJson(cacheMap.values().toArray(), CacheEntry[].class, fileWriter);
+	private synchronized void save() {
+		try (FileWriter fileWriter = new FileWriter(cacheFile)) {
+			gson.toJson(cacheMap, fileWriter);
 		} catch (Exception e) {
 			System.err.println("Could not save cache data");
 			e.printStackTrace();
 		}
 	}
 
-	public synchronized List<SongData> getSongDataArray() {
-		return cacheMap.values().stream()
-			.map(cacheEntry -> new SongData(cacheEntry.data))
-			.collect(Collectors.toList());
+	public synchronized List<SongData> getDataArray() {
+		return new ArrayList<>(cacheMap.values());
 	}
 
 }

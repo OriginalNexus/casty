@@ -117,7 +117,7 @@ public class CastyMain extends JFrame {
 
 					setUIState(UIState.STARTING);
 
-					(new SwingWorker<Void, Void>() {
+					new SwingWorker<Void, Void>() {
 						@Override
 						protected Void doInBackground() throws Exception {
 							CastyServer.getInstance().startServer(hostname, port);
@@ -137,12 +137,12 @@ public class CastyMain extends JFrame {
 							}
 							setUIState(UIState.RUNNING);
 						}
-					}).execute();
+					}.execute();
 
 				}
 				else {
 					setUIState(UIState.STOPPING);
-					(new SwingWorker<Void, Void>() {
+					new SwingWorker<Void, Void>() {
 						@Override
 						protected Void doInBackground() throws Exception {
 							CastyServer.getInstance().stopServer();
@@ -163,14 +163,16 @@ public class CastyMain extends JFrame {
 							}
 							setUIState(UIState.STOPPED);
 						}
-					}).execute();
+					}.execute();
 				}
 			}
 		});
 
 		showInTrayCheckBox.addItemListener(e -> {
-			if (showInTrayCheckBox.isSelected()) addToTray();
-			else removeFromTray();
+			if (showInTrayCheckBox.isSelected())
+				addToTray();
+			else
+				removeFromTray();
 		});
 
 		addressLabel.addMouseListener(new MouseAdapter() {

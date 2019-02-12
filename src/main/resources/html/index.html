@@ -60,9 +60,7 @@
 				<h2 class="my-2 ml-3">Playlist</h2>
 				<button id="playlist-repeat-btn" class="btn btn-flat btn-icon"><i class="material-icons">repeat</i></button>
 				<button id="playlist-cache-btn" class="btn btn-flat btn-icon"><i class="material-icons">cloud_off</i></button>
-				<ul id="playlist" class="list-group list-group-flush">
-					
-				</ul>
+				<ul id="playlist" class="list-group list-group-flush"></ul>
 			</div>
 		</div>
 
@@ -98,7 +96,7 @@
 						<button id="volume-btn" class="btn btn-flat btn-icon flex-shrink-0" type="button"><i class="material-icons">volume_up</i></button>
 						<div id="volume-wrapper" style="display: none;">
 							<div id="volume-slider-wrapper" class="card flex-row">
-								<input id="volume-slider" type="range" class="custom-range">
+								<input id="volume-slider" type="range" class="custom-range" value="80">
 							</div>
 						</div>
 						<button id="playlist-toggle-btn" class="btn btn-flat btn-icon flex-shrink-0" type="button"><i class="material-icons">queue_music</i></button>

@@ -43,7 +43,7 @@ class Main {
 			System.out.println("Author: " + ytExtractor.getAuthor());
 			System.out.println("Thumbnail: " + ytExtractor.getThumbnailUrl());
 			System.out.println("Full thumbnail: " + ytExtractor.getFullThumbnailUrl());
-			System.out.println("Next video title: " + ytExtractor.getNextVideo().getTitle());
+			System.out.println("Next video: " + ytExtractor.getNextUrl());
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

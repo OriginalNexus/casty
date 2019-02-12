@@ -61,11 +61,13 @@ public class YTPlayer {
 
         Invocable inv = (Invocable) engine;
         decryptInterface = inv.getInterface(DecryptInterface.class);
-        if (decryptInterface == null) throw new UnknownError("Could not extract method");
+        if (decryptInterface == null)
+            throw new UnknownError("Could not extract method");
     }
 
     public void decryptFormat(YTFormat f) {
-        if (!f.isEncrypted()) return;
+        if (!f.isEncrypted())
+            return;
         f.decrypt(decryptInterface.decrypt_s(f.getEncryptedSignature()));
     }
 

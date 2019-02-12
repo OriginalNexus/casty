@@ -9,15 +9,21 @@ import org.eclipse.jetty.websocket.servlet.WebSocketServletFactory;
 import javax.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.net.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Supplier;
 
 public class CastyServer {
 
 	public static final int DEFAULT_PORT = 5555;
 
 	private static final CastyServer ourInstance = new CastyServer();
-	private Server server;
-	private ServerConnector serverConnector;
+	private final Server server;
+	private final ServerConnector serverConnector;
 	private boolean running = false;
+
+	final List<StatusListener> listeners = new ArrayList<>();
+	final List<Supplier<Object>> suppliers = new ArrayList<>();
 
 	public static CastyServer getInstance() {
 		return ourInstance;
@@ -66,7 +72,7 @@ public class CastyServer {
 
 	public synchronized void startServer(String hostname, int port) throws Exception {
 		if (running)
-			throw new IllegalStateException("CastyServer already started!");
+			throw new IllegalStateException("Server already running!");
 
 		serverConnector.setPort(port);
 		serverConnector.setHost(hostname);
@@ -96,5 +102,17 @@ public class CastyServer {
 		return Inet4Address.getLoopbackAddress().getHostAddress();
 	}
 
+	public synchronized void updateStatus(Object status) {
+		if (!running)
+			throw new IllegalStateException("Server must be running");
+
+		listeners.removeIf(statusListener -> !statusListener.session.isOpen());
+		for (StatusListener l : listeners)
+			l.onUpdate(status);
+	}
+
+	public synchronized void registerStatusSupplier(Supplier<Object> supplier) {
+		suppliers.add(supplier);
+	}
 
 }

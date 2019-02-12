@@ -11,16 +11,15 @@ public class YTUrl {
 	public static YTUrl fromUrl(String url) {
 		Matcher m;
 		m = Pattern.compile("(?<protocol>http[s]?:)//(?:www\\.)?youtube\\.com/watch\\?\\S*?&?v=(?<id>[0-9A-Za-z_-]+)").matcher(url);
-		if (m.find()) {
-			YTUrl ytUrl = new YTUrl();
-			ytUrl.id = m.group("id");
-			ytUrl.protocol = m.group("protocol");
-			return ytUrl;
-		}
+		if (m.find())
+			return new YTUrl(m.group("id"), m.group("protocol"));
 		return null;
 	}
 
-	private YTUrl() {}
+	public YTUrl(String id, String protocol) {
+		this.id = id;
+		this.protocol = protocol;
+	}
 
 	public String getId() {
 		return id;
